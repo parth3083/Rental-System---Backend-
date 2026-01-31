@@ -9,36 +9,43 @@ class AuthController {
    * @swagger
    * /api/auth/register:
    *   post:
-   *     summary: Register a new user
+   *     summary: Register a new user (Customer or Vendor)
    *     tags: [Auth]
    *     requestBody:
    *       required: true
    *       content:
    *         application/json:
    *           schema:
-   *             type: object
-   *             required:
-   *               - username
-   *               - email
-   *               - password
-   *             properties:
-   *               username:
-   *                 type: string
-   *                 minLength: 3
-   *                 maxLength: 50
-   *               email:
-   *                 type: string
-   *                 format: email
-   *               password:
-   *                 type: string
-   *                 minLength: 6
-   *               role:
-   *                 type: string
-   *                 enum: [ADMIN, VENDOR, CUSTOMER]
-   *                 default: CUSTOMER
+   *             oneOf:
+   *               - $ref: '#/components/schemas/CustomerRegisterRequest'
+   *               - $ref: '#/components/schemas/VendorRegisterRequest'
+   *           examples:
+   *             customer:
+   *               summary: Customer Registration
+   *               value:
+   *                 firstName: John
+   *                 lastName: Doe
+   *                 email: john.doe@example.com
+   *                 password: password123
+   *                 role: CUSTOMER
+   *             vendor:
+   *               summary: Vendor Registration
+   *               value:
+   *                 firstName: Jane
+   *                 lastName: Smith
+   *                 email: jane.smith@example.com
+   *                 password: password123
+   *                 role: VENDOR
+   *                 companyName: ABC Corp
+   *                 productCategory: Electronics
+   *                 gstNumber: 22AAAAA0000A1Z5
    *     responses:
    *       201:
    *         description: User registered successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/AuthResponse'
    *       400:
    *         description: Validation error or user already exists
    *       500:
@@ -86,23 +93,32 @@ class AuthController {
    *       content:
    *         application/json:
    *           schema:
-   *             type: object
-   *             required:
-   *               - email
-   *               - password
-   *             properties:
-   *               email:
-   *                 type: string
-   *                 format: email
-   *               password:
-   *                 type: string
+   *             $ref: '#/components/schemas/LoginRequest'
+   *           example:
+   *             email: john.doe@example.com
+   *             password: password123
    *     responses:
    *       200:
    *         description: Login successful
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/AuthResponse'
    *       400:
    *         description: Validation error
    *       401:
    *         description: Invalid credentials
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: false
+   *                 message:
+   *                   type: string
+   *                   example: Invalid email or password
    *       500:
    *         description: Internal server error
    */
@@ -227,5 +243,131 @@ class AuthController {
     }
   }
 }
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     CustomerRegisterRequest:
+ *       type: object
+ *       required:
+ *         - firstName
+ *         - lastName
+ *         - email
+ *         - password
+ *         - role
+ *       properties:
+ *         firstName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 50
+ *           description: Customer's first name
+ *         lastName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 50
+ *           description: Customer's last name
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Customer's email address
+ *         password:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 100
+ *           description: Customer's password
+ *         role:
+ *           type: string
+ *           enum: [CUSTOMER]
+ *           description: Must be CUSTOMER for customer registration
+ *     VendorRegisterRequest:
+ *       type: object
+ *       required:
+ *         - firstName
+ *         - lastName
+ *         - email
+ *         - password
+ *         - role
+ *         - companyName
+ *         - productCategory
+ *         - gstNumber
+ *       properties:
+ *         firstName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 50
+ *           description: Vendor's first name
+ *         lastName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 50
+ *           description: Vendor's last name
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Vendor's email address
+ *         password:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 100
+ *           description: Vendor's password
+ *         role:
+ *           type: string
+ *           enum: [VENDOR]
+ *           description: Must be VENDOR for vendor registration
+ *         companyName:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 255
+ *           description: Vendor's company name
+ *         productCategory:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 255
+ *           description: Vendor's product category
+ *         gstNumber:
+ *           type: string
+ *           minLength: 15
+ *           maxLength: 15
+ *           pattern: '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$'
+ *           description: Vendor's GST number (15 characters)
+ *     LoginRequest:
+ *       type: object
+ *       required:
+ *         - email
+ *         - password
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *         password:
+ *           type: string
+ *           description: User's password
+ *     AuthResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         message:
+ *           type: string
+ *         data:
+ *           type: object
+ *           properties:
+ *             user:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 username:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 role:
+ *                   type: string
+ *                   enum: [ADMIN, VENDOR, CUSTOMER]
+ *             token:
+ *               type: string
+ */
 
 export const authController = new AuthController();

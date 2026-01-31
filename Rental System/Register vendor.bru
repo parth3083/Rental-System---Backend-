@@ -1,0 +1,28 @@
+meta {
+  name: Register vendor
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{Baseurl}}/api/auth/register
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@example.com",
+    "password": "password123",
+    "role": "VENDOR",
+    "companyName": "ABC Corp",
+    "gstNumber": "22AAAAA0056A1Z5"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

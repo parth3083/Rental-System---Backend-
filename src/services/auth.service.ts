@@ -15,7 +15,7 @@ import {
 class AuthService {
   /**
    * Register a new user
-   * 1. Create user in database
+   * 1. Create user in database (with role-specific fields)
    * 2. Flush all user-related data from Redis
    * 3. Populate Redis with new data
    */
@@ -36,14 +36,33 @@ class AuthService {
       // Hash password
       const hashedPassword = authHelper.hashPassword(data.password);
 
+      // Create full name by concatenating first and last name
+      const fullName = `${data.firstName} ${data.lastName}`;
+
+      // Prepare user data based on role
+      const userData: {
+        name: string;
+        email: string;
+        passwordHash: string;
+        role: 'CUSTOMER' | 'VENDOR';
+        companyName?: string;
+        gstin?: string;
+      } = {
+        name: fullName,
+        email: data.email,
+        passwordHash: hashedPassword,
+        role: data.role,
+      };
+
+      // Add vendor-specific fields if role is VENDOR
+      if (data.role === 'VENDOR') {
+        userData.companyName = data.companyName;
+        userData.gstin = data.gstNumber;
+      }
+
       // Create user
       const user = await db.users.create({
-        data: {
-          name: data.username,
-          email: data.email,
-          passwordHash: hashedPassword,
-          role: data.role,
-        },
+        data: userData,
       });
 
       // STEP 1: Flush all user-related data from Redis

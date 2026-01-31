@@ -1,0 +1,38 @@
+meta {
+  name: Get PRoduct
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{Baseurl}}/api/products
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IlZlbmRvciBUd28iLCJlbWFpbCI6InZlbmRvcjJAcmVudGFsLmNvbSIsImlkIjoiY21sMjZwOHphMDAwMmowZmM4bXc3ZDJneiIsInJvbGUiOiJWRU5ET1IiLCJpYXQiOjE3Njk4NjM2MTksImV4cCI6MTc2OTk1MDAxOX0.vdbt9o1Sju3bKB_T-NxVAO94u3-pB9aw4b9CAG1ajoc
+}
+
+body:json {
+  {
+    "name": "Mit_Product",
+    "description": "Hello",
+    "brand": "Samsung",
+    "color": "Blue",
+    "categoryId": 1,
+    "imageUrl": "https://example.com/images/macbook.jpg",
+    "hourlyPrice": 10,
+    "dailyPrice": 0,
+    "weeklyPrice": 0,
+    "monthlyPrice": 0,
+    "discountPercentage": 0,
+    "securityDeposit": 0,
+    "isPublished": true
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,7 +1,7 @@
 meta {
   name: Register user
   type: http
-  seq: 1
+  seq: 2
 }
 
 post {
@@ -12,13 +12,48 @@ post {
 
 body:json {
   {
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john.doe@example.com",
-    "password": "password123",
+    "username": "customer1",
+    "email": "dhyey@rental.com",
+    "password": "123456",
     "role": "CUSTOMER"
   }
   
+}
+
+script:post-response {
+  let body;
+  
+  // Bruno sometimes gives string, sometimes object (edge cases)
+  if (typeof res.body === "string") {
+      body = JSON.parse(res.body);
+  } else {
+      body = res.body;
+  }
+  
+  if (body && body.data && body.data.token) {
+      bru.setEnvVar("access_token", body.data.token);
+      console.log("✅ access_token saved successfully");
+  } else {
+      console.log("❌ Token not found in response");
+  }
+}
+
+script:post-response {
+  let body;
+  
+  // Bruno sometimes gives string, sometimes object (edge cases)
+  if (typeof res.body === "string") {
+      body = JSON.parse(res.body);
+  } else {
+      body = res.body;
+  }
+  
+  if (body && body.data && body.data.token) {
+      bru.setEnvVar("access_token", body.data.token);
+      console.log("✅ access_token saved successfully");
+  } else {
+      console.log("❌ Token not found in response");
+  }
 }
 
 settings {

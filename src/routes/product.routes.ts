@@ -8,6 +8,7 @@ import {
 const router: Router = Router();
 
 router.get('/', productController.getProducts);
+router.get('/:id', productController.getProductById);
 router.post(
   '/',
   authMiddleware,

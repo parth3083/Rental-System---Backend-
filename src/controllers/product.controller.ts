@@ -117,6 +117,64 @@ class ProductController {
 
   /**
    * @swagger
+   * /api/products/{id}:
+   *   get:
+   *     summary: Get product details by ID
+   *     tags: [Products]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Product details retrieved successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 message:
+   *                   type: string
+   *                 data:
+   *                   $ref: '#/components/schemas/ProductDetail'
+   *       404:
+   *         description: Product not found
+   *       500:
+   *         description: Internal server error
+   */
+  async getProductById(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const result = await productService.getProductById(id as string);
+
+      res.status(200).json({
+        success: true,
+        message: 'Product details retrieved successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === 'Product not found') {
+        res.status(404).json({
+          success: false,
+          message: error.message,
+        });
+        return;
+      }
+
+      logger.error('Get product by id controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  /**
+   * @swagger
    * /api/products:
    *   post:
    *     summary: Create a new product

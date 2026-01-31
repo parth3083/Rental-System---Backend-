@@ -21,5 +21,27 @@ router.post(
   roleMiddleware('VENDOR'),
   salesOrderController.createInvoice
 );
+router.patch(
+  '/invoice/:invoiceId/status',
+  authMiddleware,
+  roleMiddleware('VENDOR'),
+  salesOrderController.updateInvoiceStatus
+);
+
+// Route to create a new sales order
+router.post(
+  '/',
+  authMiddleware,
+  roleMiddleware('CUSTOMER'),
+  salesOrderController.createOrder
+);
+
+// Route to update sales order status
+router.patch(
+  '/:orderId/status',
+  authMiddleware,
+  roleMiddleware('VENDOR'),
+  salesOrderController.updateOrderStatus
+);
 
 export default router;

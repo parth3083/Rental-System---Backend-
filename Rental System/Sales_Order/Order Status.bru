@@ -1,0 +1,21 @@
+meta {
+  name: Order Status
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{Baseurl}}/api/sales-orders/cml2oikjm0000m0fgfsbwf5in/status
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "status": "SENT"
+  }
+}

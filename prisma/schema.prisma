@@ -27,9 +27,9 @@ model Users {
   pincode      String?
   products     Product[]
   cart         Cart[]
-  wishlist     Wishlist[]
   orders       SalesOrder[] @relation("CustomerOrders")
   vendorOrders SalesOrder[] @relation("VendorOrders")
+  wishlist     Wishlist[]
 
   @@map("users")
 }
@@ -69,10 +69,10 @@ model Product {
   category           Category           @relation(fields: [categoryId], references: [id])
   vendor             Users              @relation(fields: [vendorId], references: [id])
   cartItems          Cart[]
-  wishlistItems      Wishlist[]
   salesOrderDetails  SalesOrderDetail[]
   stock              Stock?
   stockTransactions  StockTransaction[]
+  wishlistItems      Wishlist[]
 }
 
 model Stock {
@@ -114,8 +114,6 @@ model SalesOrder {
   status          OrderStatus        @default(DRAFT)
   paymentPlan     PaymentPlan        @map("payment_plan")
   totalOrderValue Decimal            @map("total_order_value") @db.Decimal(10, 2)
-  startDate       DateTime?          @map("start_date")
-  endDate         DateTime?          @map("end_date")
   createdAt       DateTime           @default(now()) @map("created_at")
   createdBy       Int?               @map("created_by")
   updatedAt       DateTime           @updatedAt @map("updated_at")
@@ -141,14 +139,16 @@ model SalesOrderDetail {
   quantity           Int
   unitPrice          Decimal    @map("unit_price") @db.Decimal(10, 2)
   subtotal           Decimal    @db.Decimal(10, 2)
-  totalDepositAmount Decimal    @default(0) @map("total_deposit_amount") @db.Decimal(10, 2)
+  totalDepositAmount Decimal    @map("total_deposit_amount") @db.Decimal(10, 2)
   createdAt          DateTime   @default(now()) @map("created_at")
   createdBy          Int?       @map("created_by")
   updatedAt          DateTime   @updatedAt @map("updated_at")
   updatedBy          Int?       @map("updated_by")
   deletedAt          DateTime?  @map("deleted_at")
-  order              SalesOrder @relation(fields: [orderId], references: [id])
-  product            Product    @relation(fields: [productId], references: [id])
+  end_date   DateTime?
+  start_date DateTime?
+  order      SalesOrder @relation(fields: [orderId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
 
   @@map("sales_order_details")
 }
@@ -205,6 +205,19 @@ model Cart {
   @@map("cart")
 }
 
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  product   Product  @relation(fields: [productId], references: [id])
+  user      Users    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, productId])
+  @@map("wishlist")
+}
+
 enum UsersRole {
   ADMIN
   VENDOR
@@ -230,18 +243,4 @@ enum DeliveryStatus {
   DISPATCHED
   DELIVERED
   RETURNED
-}
-
-model Wishlist {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  productId String   @map("product_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user    Users   @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-
-  @@unique([userId, productId])
-  @@map("wishlist")
 }

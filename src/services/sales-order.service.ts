@@ -165,161 +165,138 @@ export const salesOrderService = {
             );
           }
         }
+      }
 
-        // 2. Group items by (vendorId + isService + startDate + endDate)
-        const groups = new Map<
-          string,
-          {
-            vendorId: string;
-            isService: boolean;
-            startDate?: Date;
-            endDate?: Date;
-            items: typeof cartItems;
-          }
-        >();
+      // 2. Group items by (vendorId + isService)
+      const groups = new Map<
+        string,
+        {
+          vendorId: string;
+          isService: boolean;
+          items: typeof cartItems;
+        }
+      >();
 
-        for (const item of cartItems) {
-          const vendorId = item.product.vendorId;
+      for (const item of cartItems) {
+        const vendorId = item.product.vendorId;
+        const key = `${vendorId}-${item.isService}`;
 
-          // Normalize dates
-          let startIso = 'null';
-          let endIso = 'null';
-          let startDateObj: Date | undefined;
-          let endDateObj: Date | undefined;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            vendorId,
+            isService: item.isService,
+            items: [],
+          });
+        }
+        groups.get(key)!.items.push(item);
+      }
 
-          if (item.isService) {
+      // 3. Create Orders for each group
+      const createdOrders = [];
+
+      for (const group of groups.values()) {
+        const { vendorId, isService, items: groupItems } = group;
+
+        // Calculate Totals and Details
+        let totalOrderValue = new Prisma.Decimal(0);
+        const orderDetailsData = [];
+
+        for (const item of groupItems) {
+          const product = item.product;
+          const unitPrice = product.dailyPrice;
+          let subtotal = new Prisma.Decimal(0);
+          let startDate: Date | undefined;
+          let endDate: Date | undefined;
+          let rentalDays = 0;
+
+          if (isService) {
             if (!item.startDate || !item.endDate) {
-              // Should not happen ideally if validated on cart addition
               throw new Error(
-                `Start and End date required for RENTAL/Service item ${item.productId}`
+                `Start and end date required for rental item: ${item.product.name}`
               );
             }
-            startDateObj = new Date(item.startDate);
-            endDateObj = new Date(item.endDate);
-            startIso = startDateObj.toISOString();
-            endIso = endDateObj.toISOString();
-          }
+            startDate = new Date(item.startDate);
+            endDate = new Date(item.endDate);
 
-          const key = `${vendorId}-${item.isService}-${startIso}-${endIso}`;
-
-          if (!groups.has(key)) {
-            groups.set(key, {
-              vendorId,
-              isService: item.isService,
-              startDate: startDateObj!,
-              endDate: endDateObj!,
-              items: [],
-            });
-          }
-          groups.get(key)!.items.push(item);
-        }
-
-        // 3. Create Orders for each group
-        const createdOrders = [];
-
-        for (const group of groups.values()) {
-          const {
-            vendorId,
-            isService,
-            startDate,
-            endDate,
-            items: groupItems,
-          } = group;
-
-          // Calculate Totals and Details
-          let totalOrderValue = new Prisma.Decimal(0);
-          const orderDetailsData = [];
-
-          let rentalDays = 0;
-          if (isService && startDate && endDate) {
             const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
             rentalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             if (rentalDays < 1) rentalDays = 1;
+
+            subtotal = unitPrice.mul(item.quantity).mul(rentalDays);
+          } else {
+            // PURCHASE (Not a service)
+            subtotal = unitPrice.mul(item.quantity);
           }
 
-          for (const item of groupItems) {
-            const product = item.product;
-            const unitPrice = product.dailyPrice;
-            let subtotal = new Prisma.Decimal(0);
+          const totalDepositAmount = (
+            product.securityDeposit || new Prisma.Decimal(0)
+          ).mul(item.quantity);
 
-            if (isService) {
-              subtotal = unitPrice.mul(item.quantity).mul(rentalDays);
-            } else {
-              // PURCHASE (Not a service)
-              subtotal = unitPrice.mul(item.quantity);
-            }
+          totalOrderValue = totalOrderValue.add(subtotal);
 
-            const totalDepositAmount = (
-              product.securityDeposit || new Prisma.Decimal(0)
-            ).mul(item.quantity);
-
-            totalOrderValue = totalOrderValue.add(subtotal);
-
-            orderDetailsData.push({
-              productId: product.id,
-              quantity: item.quantity,
-              unitPrice: unitPrice,
-              subtotal: subtotal,
-              totalDepositAmount: totalDepositAmount,
-            });
-          }
-
-          const initialStatus = !isService
-            ? OrderStatus.APPROVED
-            : OrderStatus.DRAFT;
-
-          const order = await db.salesOrder.create({
-            data: {
-              customerId,
-              vendorId,
-              isService,
-              status: initialStatus,
-              paymentPlan: 'FULL_UPFRONT', // Default
-              totalOrderValue,
-              startDate: startDate || null,
-              endDate: endDate || null,
-              details: {
-                create: orderDetailsData,
-              },
-            },
-            include: {
-              details: true,
-            },
+          orderDetailsData.push({
+            productId: product.id,
+            quantity: item.quantity,
+            unitPrice: unitPrice,
+            subtotal: subtotal,
+            totalDepositAmount: totalDepositAmount,
+            start_date: startDate || null,
+            end_date: endDate || null,
           });
-
-          // Handle Stock Deduction for APPROVED Purchase Orders
-          if (initialStatus === OrderStatus.APPROVED && !isService) {
-            for (const item of groupItems) {
-              await db.stock.update({
-                where: { productId: item.productId },
-                data: {
-                  totalPhysicalQuantity: { decrement: item.quantity },
-                },
-              });
-              // Log transaction
-              await db.stockTransaction.create({
-                data: {
-                  productId: item.productId,
-                  orderId: order.id,
-                  moveType: 'SALE',
-                  quantity: item.quantity,
-                  startDate: new Date(),
-                  endDate: new Date(),
-                },
-              });
-            }
-          }
-
-          createdOrders.push(order);
         }
-        // 4. Clear Cart for User ?? - Usually standard behavior.
-        // Assuming we should clear the cart after successful order creation
-        await db.cart.deleteMany({
-          where: { userId: customerId },
+
+        const initialStatus = !isService
+          ? OrderStatus.APPROVED
+          : OrderStatus.DRAFT;
+
+        const order = await db.salesOrder.create({
+          data: {
+            customerId,
+            vendorId,
+            isService,
+            status: initialStatus,
+            paymentPlan: 'FULL_UPFRONT', // Default
+            totalOrderValue,
+            details: {
+              create: orderDetailsData,
+            },
+          },
+          include: {
+            details: true,
+          },
         });
 
-        return createdOrders;
+        // Handle Stock Deduction for APPROVED Purchase Orders
+        if (initialStatus === OrderStatus.APPROVED && !isService) {
+          for (const item of groupItems) {
+            await db.stock.update({
+              where: { productId: item.productId },
+              data: {
+                totalPhysicalQuantity: { decrement: item.quantity },
+              },
+            });
+            // Log transaction
+            await db.stockTransaction.create({
+              data: {
+                productId: item.productId,
+                orderId: order.id,
+                moveType: 'SALE',
+                quantity: item.quantity,
+                startDate: new Date(),
+                endDate: new Date(),
+              },
+            });
+          }
+        }
+
+        createdOrders.push(order);
       }
+      // 4. Clear Cart for User
+      await db.cart.deleteMany({
+        where: { userId: customerId },
+      });
+
+      return createdOrders;
     } catch (error) {
       logger.error('Error in createOrdersFromCart service', error);
       throw error;
@@ -359,13 +336,18 @@ export const salesOrderService = {
         status === OrderStatus.APPROVED &&
         order.status !== OrderStatus.APPROVED
       ) {
-        if (order.isService && order.startDate && order.endDate) {
+        if (order.isService) {
           // RENTAL: Check availability and Reserve
           for (const detail of order.details) {
+            if (!detail.start_date || !detail.end_date) {
+              throw new Error(
+                `Missing dates for rental item in order detail ${detail.id}`
+              );
+            }
             const isAvailable = await cartService.checkStockAvailability(
               detail.productId,
-              order.startDate,
-              order.endDate,
+              detail.start_date,
+              detail.end_date,
               detail.quantity
             );
             if (!isAvailable) {
@@ -383,8 +365,8 @@ export const salesOrderService = {
                 orderId: order.id,
                 moveType: 'RENTAL',
                 quantity: detail.quantity,
-                startDate: order.startDate!,
-                endDate: order.endDate!,
+                startDate: detail.start_date!,
+                endDate: detail.end_date!,
               },
             });
           }

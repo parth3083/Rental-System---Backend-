@@ -1,0 +1,20 @@
+meta {
+  name: Get User Profile
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{Baseurl}}/api/auth/profile
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImN1c3RvbWVyMSIsImVtYWlsIjoiY3VzdG9tZXIxQHJlbnRhbC5jb20iLCJpZCI6ImNtbDIwczd2ODAwMDA5d2ZjcGRtZ21zdHMiLCJyb2xlIjoiQ1VTVE9NRVIiLCJpYXQiOjE3Njk4NDYyODgsImV4cCI6MTc2OTkzMjY4OH0.c3Jsp7n5lzWbZAx7oxdZAOG5EsUHc376YpErapZS5bs
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -34,6 +34,11 @@ export const REDIS_KEYS = {
   CACHE: {
     GENERIC: (key: string) => `cache:${key}`,
   },
+
+  // Password reset
+  PASSWORD_RESET: {
+    CODE: (email: string) => `password_reset:code:${email}`,
+  },
 } as const;
 
 /**
@@ -62,6 +67,9 @@ export const REDIS_TTL = {
 
   // Rate limiting
   RATE_LIMIT: 60, // 1 minute window
+
+  // Password reset
+  PASSWORD_RESET_CODE: 900, // 15 minutes
 } as const;
 
 /**

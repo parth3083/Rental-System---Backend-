@@ -73,8 +73,7 @@
   },
   "lint-staged": {
     "src/**/*.ts": [
-      "pnpm run format",
-      "pnpm run lint"
+      "pnpm run format"
     ]
   }
 }

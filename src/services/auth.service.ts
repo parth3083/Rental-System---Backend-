@@ -3,6 +3,9 @@ import { authHelper } from '../helpers/auth.helper.js';
 import type {
   RegisterSchemaType,
   LoginSchemaType,
+  ForgotPasswordSchemaType,
+  VerifyResetCodeSchemaType,
+  ResetPasswordSchemaType,
 } from '../validations/auth.validation.js';
 import type { AuthResponse, UserResponse } from '../types/auth.types.js';
 import { logger } from '../config/logger.config.js';
@@ -11,6 +14,9 @@ import {
   type CachedUserData,
   type CachedUserWithPassword,
 } from './redis.service.js';
+import { sendWelcomeEmail } from '../templates/email/welcome.email.template.js';
+import { sendPasswordResetEmail } from '../templates/email/passwordReset.email.template.js';
+import { sendPasswordResetSuccessEmail } from '../templates/email/password-reset.email.template.js';
 
 class AuthService {
   /**
@@ -110,6 +116,16 @@ class AuthService {
       );
 
       logger.info(`User registered successfully: ${user.email}`);
+
+      // Send welcome email (non-blocking)
+      logger.info(`Sending welcome email to: ${user.email}`);
+      sendWelcomeEmail(user.email, user.name)
+        .then(() => {
+          logger.info(`Welcome email sent successfully to: ${user.email}`);
+        })
+        .catch(error => {
+          logger.error(`Failed to send welcome email to ${user.email}:`, error);
+        });
 
       return {
         success: true,
@@ -324,6 +340,250 @@ class AuthService {
       return users.map(u => ({ ...u, username: u.name }));
     } catch (error) {
       logger.error('Get all users error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a 6-digit verification code
+   */
+  private generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Forgot Password - Send verification code to user's email
+   * Uses Redis to store verification codes with TTL
+   */
+  async forgotPassword(
+    data: ForgotPasswordSchemaType
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Find user by email
+      const user = await db.users.findUnique({
+        where: { email: data.email },
+      });
+
+      // For security, always return success message even if user doesn't exist
+      // This prevents email enumeration attacks
+      if (!user) {
+        logger.info(
+          `Password reset requested for non-existent email: ${data.email}`
+        );
+        return {
+          success: true,
+          message:
+            'If an account with this email exists, a verification code has been sent.',
+        };
+      }
+
+      // Check if user is deleted or restricted
+      if (user.isDeleted) {
+        return {
+          success: false,
+          message: 'This account has been deleted.',
+        };
+      }
+
+      // Generate new verification code
+      const verificationCode = this.generateVerificationCode();
+      const expiresInMinutes = 15;
+
+      // Store verification code in Redis with TTL
+      const stored = await redisService.storePasswordResetCode(
+        user.email,
+        verificationCode
+      );
+      logger.info(
+        `Password reset code generated: ${verificationCode} for email: ${user.email}`
+      );
+      logger.info(`Code stored in Redis: ${stored}`);
+
+      // Send password reset email
+      await sendPasswordResetEmail(
+        user.email,
+        user.name,
+        verificationCode,
+        expiresInMinutes
+      );
+
+      logger.info(`Password reset code sent to: ${user.email}`);
+
+      return {
+        success: true,
+        message:
+          'If an account with this email exists, a verification code has been sent.',
+      };
+    } catch (error) {
+      logger.error('Forgot password error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify Reset Code - Check if the code is valid
+   */
+  async verifyResetCode(
+    data: VerifyResetCodeSchemaType
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      logger.info('===== VERIFY RESET CODE START =====');
+      logger.info(`Email received: "${data.email}"`);
+      logger.info(
+        `Code received: "${data.code}" (type: ${typeof data.code}, length: ${data.code?.length})`
+      );
+
+      // Find user by email
+      const user = await db.users.findUnique({
+        where: { email: data.email },
+      });
+
+      if (!user) {
+        logger.warn(`User not found for email: ${data.email}`);
+        return {
+          success: false,
+          message: 'Invalid verification code.',
+        };
+      }
+
+      logger.info(`User found: ${user.id}`);
+
+      // Get verification code from Redis
+      const storedCode = await redisService.getPasswordResetCode(data.email);
+
+      logger.info(
+        `Raw stored code from Redis: "${storedCode}" (type: ${typeof storedCode})`
+      );
+
+      // Handle null case
+      if (storedCode === null || storedCode === undefined) {
+        logger.warn(`No code found in Redis for email: ${data.email}`);
+        return {
+          success: false,
+          message: 'Invalid or expired verification code.',
+        };
+      }
+
+      // Convert both to strings and trim
+      const storedCodeStr = String(storedCode).trim();
+      const receivedCodeStr = String(data.code).trim();
+
+      logger.info(
+        `Stored code (normalized): "${storedCodeStr}" (length: ${storedCodeStr.length})`
+      );
+      logger.info(
+        `Received code (normalized): "${receivedCodeStr}" (length: ${receivedCodeStr.length})`
+      );
+
+      // Character-by-character comparison for debugging
+      logger.info('Character comparison:');
+      for (
+        let i = 0;
+        i < Math.max(storedCodeStr.length, receivedCodeStr.length);
+        i++
+      ) {
+        const storedChar = storedCodeStr[i] || 'MISSING';
+        const receivedChar = receivedCodeStr[i] || 'MISSING';
+        const match = storedChar === receivedChar ? '✓' : '✗';
+        logger.info(
+          `  [${i}]: stored="${storedChar}" received="${receivedChar}" ${match}`
+        );
+      }
+
+      const codesMatch = storedCodeStr === receivedCodeStr;
+      logger.info(`Final comparison result: ${codesMatch}`);
+
+      if (!codesMatch) {
+        logger.warn(`Code verification FAILED for ${data.email}`);
+        return {
+          success: false,
+          message: 'Invalid or expired verification code.',
+        };
+      }
+
+      logger.info(`Reset code verified successfully for: ${user.email}`);
+      logger.info('===== VERIFY RESET CODE END =====');
+
+      return {
+        success: true,
+        message: 'Verification code is valid.',
+      };
+    } catch (error) {
+      logger.error('Verify reset code error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reset Password - Set new password after code verification
+   */
+  async resetPassword(
+    data: ResetPasswordSchemaType
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Find user by email
+      const user = await db.users.findUnique({
+        where: { email: data.email },
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'Invalid verification code.',
+        };
+      }
+
+      // Get verification code from Redis
+      const storedCode = await redisService.getPasswordResetCode(data.email);
+
+      // Normalize both codes to strings and trim whitespace
+      const normalizedStoredCode = storedCode?.toString().trim();
+      const normalizedReceivedCode = data.code?.toString().trim();
+
+      if (
+        !normalizedStoredCode ||
+        normalizedStoredCode !== normalizedReceivedCode
+      ) {
+        return {
+          success: false,
+          message: 'Invalid or expired verification code.',
+        };
+      }
+
+      // Hash new password
+      const hashedPassword = authHelper.hashPassword(data.newPassword);
+
+      // Update user password
+      await db.users.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: hashedPassword,
+          updatedAt: new Date(),
+        },
+      });
+
+      // Delete the verification code from Redis (one-time use)
+      await redisService.deletePasswordResetCode(data.email);
+
+      // Invalidate Redis cache for this user
+      await redisService.flushAllUserData();
+      logger.info(`Password reset successfully for: ${user.email}`);
+
+      // Send password reset success email (non-blocking)
+      sendPasswordResetSuccessEmail(user.email, user.name).catch(error => {
+        logger.error(
+          `Failed to send password reset success email to ${user.email}:`,
+          error
+        );
+      });
+
+      return {
+        success: true,
+        message:
+          'Password has been reset successfully. You can now login with your new password.',
+      };
+    } catch (error) {
+      logger.error('Reset password error:', error);
       throw error;
     }
   }

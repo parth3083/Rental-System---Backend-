@@ -57,3 +57,43 @@ export type CustomerRegisterSchemaType = z.infer<typeof customerRegisterSchema>;
 export type VendorRegisterSchemaType = z.infer<typeof vendorRegisterSchema>;
 export type RegisterSchemaType = z.infer<typeof registerSchema>;
 export type LoginSchemaType = z.infer<typeof loginSchema>;
+
+// Forgot Password Schema - Step 1: Request password reset
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email format'),
+});
+
+// Verify Reset Code Schema - Step 2: Verify the code sent to email
+export const verifyResetCodeSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  code: z
+    .string({ message: 'Verification code is required' })
+    .length(6, 'Verification code must be 6 digits')
+    .regex(/^\d{6}$/, 'Verification code must contain only digits'),
+});
+
+// Reset Password Schema - Step 3: Set new password
+export const resetPasswordSchema = z
+  .object({
+    email: z.string().email('Invalid email format'),
+    code: z
+      .string({ message: 'Verification code is required' })
+      .length(6, 'Verification code must be 6 digits')
+      .regex(/^\d{6}$/, 'Verification code must contain only digits'),
+    newPassword: z
+      .string({ message: 'New password is required' })
+      .min(6, 'Password must be at least 6 characters')
+      .max(100, 'Password must not exceed 100 characters'),
+    confirmPassword: z
+      .string({ message: 'Confirm password is required' })
+      .min(1, 'Confirm password is required'),
+  })
+  .refine(data => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+// Inferred types for password reset flow
+export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
+export type VerifyResetCodeSchemaType = z.infer<typeof verifyResetCodeSchema>;
+export type ResetPasswordSchemaType = z.infer<typeof resetPasswordSchema>;

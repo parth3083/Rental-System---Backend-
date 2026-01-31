@@ -288,6 +288,70 @@ class RedisService implements IRedisService {
       throw error;
     }
   }
+
+  // ==================== PASSWORD RESET METHODS ====================
+
+  /**
+   * Store password reset verification code in Redis
+   * @param email - User's email address
+   * @param code - 6-digit verification code
+   * @returns Promise<boolean> - true if successful, false otherwise
+   */
+  async storePasswordResetCode(email: string, code: string): Promise<boolean> {
+    try {
+      const key = REDIS_KEYS.PASSWORD_RESET.CODE(email);
+      // Using Upstash Redis set with ex option for expiration
+      await redis.set(key, code, { ex: REDIS_TTL.PASSWORD_RESET_CODE });
+      logger.info(
+        `Stored password reset code "${code}" for email: ${email} (TTL: ${REDIS_TTL.PASSWORD_RESET_CODE}s)`
+      );
+      return true;
+    } catch (error) {
+      logger.error('Error storing password reset code:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get password reset verification code from Redis
+   * @param email - User's email address
+   * @returns Promise<string | null> - Verification code or null if not found/expired
+   */
+  async getPasswordResetCode(email: string): Promise<string | null> {
+    try {
+      const key = REDIS_KEYS.PASSWORD_RESET.CODE(email);
+      const code = await redis.get<string>(key);
+
+      logger.info(`Retrieved code from Redis for ${email}: "${code}"`);
+
+      if (!code) {
+        logger.debug('Password reset code not found or expired');
+        return null;
+      }
+
+      return code;
+    } catch (error) {
+      logger.error('Error getting password reset code:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete password reset verification code from Redis
+   * @param email - User's email address
+   * @returns Promise<boolean> - true if successful, false otherwise
+   */
+  async deletePasswordResetCode(email: string): Promise<boolean> {
+    try {
+      const key = REDIS_KEYS.PASSWORD_RESET.CODE(email);
+      await redis.del(key);
+      logger.info('Deleted password reset code from Redis');
+      return true;
+    } catch (error) {
+      logger.error('Error deleting password reset code:', error);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance

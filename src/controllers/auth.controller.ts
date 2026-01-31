@@ -1,6 +1,12 @@
 import type { Request, Response } from 'express';
 import { authService } from '../services/auth.service.js';
-import { registerSchema, loginSchema } from '../validations/auth.validation.js';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  verifyResetCodeSchema,
+  resetPasswordSchema,
+} from '../validations/auth.validation.js';
 import { logger } from '../config/logger.config.js';
 import { ZodError } from 'zod';
 
@@ -242,6 +248,171 @@ class AuthController {
       });
     }
   }
+
+  /**
+   * @swagger
+   * /api/auth/forgot-password:
+   *   post:
+   *     summary: Request password reset
+   *     description: Sends a 6-digit verification code to the user's email for password reset
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/ForgotPasswordRequest'
+   *           example:
+   *             email: john.doe@example.com
+   *     responses:
+   *       200:
+   *         description: Verification code sent successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MessageResponse'
+   *       400:
+   *         description: Validation error
+   *       500:
+   *         description: Internal server error
+   */
+  async forgotPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = forgotPasswordSchema.parse(req.body);
+      const result = await authService.forgotPassword(validatedData);
+
+      res.status(200).json(result);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: error.issues.map(e => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
+      }
+      logger.error('Forgot password controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/auth/verify-reset-code:
+   *   post:
+   *     summary: Verify password reset code
+   *     description: Verifies the 6-digit code sent to user's email
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/VerifyResetCodeRequest'
+   *           example:
+   *             email: john.doe@example.com
+   *             code: "123456"
+   *     responses:
+   *       200:
+   *         description: Code verification result
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MessageResponse'
+   *       400:
+   *         description: Validation error or invalid code
+   *       500:
+   *         description: Internal server error
+   */
+  async verifyResetCode(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = verifyResetCodeSchema.parse(req.body);
+      const result = await authService.verifyResetCode(validatedData);
+
+      const statusCode = result.success ? 200 : 400;
+      res.status(statusCode).json(result);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: error.issues.map(e => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
+      }
+      logger.error('Verify reset code controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/auth/reset-password:
+   *   post:
+   *     summary: Reset password
+   *     description: Sets a new password after code verification
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/ResetPasswordRequest'
+   *           example:
+   *             email: john.doe@example.com
+   *             code: "123456"
+   *             newPassword: newPassword123
+   *             confirmPassword: newPassword123
+   *     responses:
+   *       200:
+   *         description: Password reset successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/MessageResponse'
+   *       400:
+   *         description: Validation error or invalid code
+   *       500:
+   *         description: Internal server error
+   */
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = resetPasswordSchema.parse(req.body);
+      const result = await authService.resetPassword(validatedData);
+
+      const statusCode = result.success ? 200 : 400;
+      res.status(statusCode).json(result);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: error.issues.map(e => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
+      }
+      logger.error('Reset password controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
 }
 
 /**
@@ -368,6 +539,66 @@ class AuthController {
  *                   enum: [ADMIN, VENDOR, CUSTOMER]
  *             token:
  *               type: string
+ *     ForgotPasswordRequest:
+ *       type: object
+ *       required:
+ *         - email
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *     VerifyResetCodeRequest:
+ *       type: object
+ *       required:
+ *         - email
+ *         - code
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *         code:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 6
+ *           pattern: '^\d{6}$'
+ *           description: 6-digit verification code sent to email
+ *     ResetPasswordRequest:
+ *       type: object
+ *       required:
+ *         - email
+ *         - code
+ *         - newPassword
+ *         - confirmPassword
+ *       properties:
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: User's email address
+ *         code:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 6
+ *           pattern: '^\d{6}$'
+ *           description: 6-digit verification code sent to email
+ *         newPassword:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 100
+ *           description: New password
+ *         confirmPassword:
+ *           type: string
+ *           minLength: 6
+ *           maxLength: 100
+ *           description: Confirm new password (must match newPassword)
+ *     MessageResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         message:
+ *           type: string
  */
 
 export const authController = new AuthController();

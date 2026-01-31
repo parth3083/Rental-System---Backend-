@@ -1,9 +1,11 @@
-export enum DurationUnit {
-  Hour = 'Hour',
-  Day = 'Day',
-  Month = 'Month',
-  Year = 'Year',
-}
+export type DurationUnit = 'Hour' | 'Day' | 'Week' | 'Month';
+
+export const DurationUnit = {
+  Hour: 'Hour',
+  Day: 'Day',
+  Week: 'Week',
+  Month: 'Month',
+} as const;
 
 export interface RentalDurationFilter {
   value: number;
@@ -11,38 +13,49 @@ export interface RentalDurationFilter {
 }
 
 export interface GetProductsRequest {
-  // --- Basic Filters ---
-  searchTerm?: string;
-  pageNumber?: number; // Default 1
-  pageSize?: number; // Default 10
+  searchTerm?: string | undefined;
+  pageNumber?: number | undefined; // default 1
+  pageSize?: number | undefined; // default 10
 
-  // --- Sidebar Filters ---
   brands?: string[] | undefined;
   colors?: string[] | undefined;
   categoryId?: number | undefined;
 
-  // --- Price Range Slider ---
-  minPrice?: number | undefined; // C# uses decimal, TS uses number
+  minPrice?: number | undefined;
   maxPrice?: number | undefined;
 
-  // --- The New Duration Logic ---
   duration?: RentalDurationFilter | undefined;
 }
 
+export interface CreateProductRequest {
+  name: string;
+  description: string;
+  brand: string;
+  color: string;
+  categoryId: number;
+  imageUrl: string;
+  hourlyPrice?: number;
+  dailyPrice?: number;
+  weeklyPrice?: number;
+  monthlyPrice?: number;
+  discountPercentage: number;
+  taxPercentage?: number;
+  securityDeposit: number;
+  isPublished: boolean;
+}
+
 export interface ProductCardDto {
-  id: number;
+  id: string;
   name: string;
   brand: string;
   imageUrl: string;
   color: string;
 
-  // --- Pricing Display ---
   priceLabel: string;
-  originalPrice: number; // decimal in C#
+  originalPrice: number;
   finalPrice: number;
   discountPercentage: number;
 
-  // --- Availability ---
   isAvailable: boolean;
 }
 

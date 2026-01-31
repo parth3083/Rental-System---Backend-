@@ -110,31 +110,134 @@ const swaggerOptions: Options = {
             },
           },
         },
+        DurationUnit: {
+          type: 'string',
+          enum: ['Hour', 'Day', 'Week', 'Month'],
+          description: 'Unit for rental duration',
+        },
+        RentalDurationFilter: {
+          type: 'object',
+          properties: {
+            value: {
+              type: 'integer',
+              description: 'Duration value (e.g., 2)',
+            },
+            unit: {
+              $ref: '#/components/schemas/DurationUnit',
+            },
+          },
+        },
         ProductCardDto: {
           type: 'object',
           properties: {
-            id: { type: 'integer' },
-            name: { type: 'string' },
-            brand: { type: 'string' },
-            imageUrl: { type: 'string' },
-            color: { type: 'string' },
-            priceLabel: { type: 'string' },
-            originalPrice: { type: 'number', format: 'double' },
-            finalPrice: { type: 'number', format: 'double' },
-            discountPercentage: { type: 'integer' },
-            isAvailable: { type: 'boolean' },
+            id: {
+              type: 'string',
+              description: 'Product unique identifier',
+            },
+            name: {
+              type: 'string',
+            },
+            brand: {
+              type: 'string',
+            },
+            imageUrl: {
+              type: 'string',
+            },
+            color: {
+              type: 'string',
+            },
+            priceLabel: {
+              type: 'string',
+              description:
+                'Display label for price (e.g. "Total for 2 Months" or "Per Day")',
+            },
+            originalPrice: {
+              type: 'number',
+              format: 'decimal',
+            },
+            finalPrice: {
+              type: 'number',
+              format: 'decimal',
+            },
+            discountPercentage: {
+              type: 'integer',
+            },
+            isAvailable: {
+              type: 'boolean',
+            },
           },
         },
-        PagedProductResult: {
+        PagedResultProduct: {
           type: 'object',
           properties: {
             items: {
               type: 'array',
-              items: { $ref: '#/components/schemas/ProductCardDto' },
+              items: {
+                $ref: '#/components/schemas/ProductCardDto',
+              },
             },
-            totalCount: { type: 'integer' },
-            pageNumber: { type: 'integer' },
-            pageSize: { type: 'integer' },
+            totalCount: {
+              type: 'integer',
+            },
+            pageNumber: {
+              type: 'integer',
+            },
+            pageSize: {
+              type: 'integer',
+            },
+          },
+        },
+        CreateProductRequest: {
+          type: 'object',
+          required: [
+            'name',
+            'description',
+            'brand',
+            'categoryId',
+            'imageUrl',
+            'securityDeposit',
+          ],
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            brand: { type: 'string' },
+            color: { type: 'string', default: 'Generic' },
+            categoryId: { type: 'integer' },
+            imageUrl: { type: 'string', format: 'uri' },
+            hourlyPrice: { type: 'number', nullable: true },
+            dailyPrice: { type: 'number', nullable: true },
+            weeklyPrice: { type: 'number', nullable: true },
+            monthlyPrice: { type: 'number', nullable: true },
+            discountPercentage: { type: 'integer', default: 0 },
+            securityDeposit: { type: 'number' },
+            isPublished: { type: 'boolean', default: true },
+          },
+        },
+        UpdateProductRequest: {
+          type: 'object',
+          required: [
+            'name',
+            'description',
+            'brand',
+            'categoryId',
+            'imageUrl',
+            'securityDeposit',
+          ],
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            brand: { type: 'string' },
+            color: { type: 'string', default: 'Generic' },
+            categoryId: { type: 'integer' },
+            imageUrl: { type: 'string', format: 'uri' },
+            hourlyPrice: { type: 'number', nullable: true },
+            dailyPrice: { type: 'number', nullable: true },
+            weeklyPrice: { type: 'number', nullable: true },
+            monthlyPrice: { type: 'number', nullable: true },
+            discountPercentage: { type: 'integer', default: 0 },
+            securityDeposit: { type: 'number' },
+            isAvailable: { type: 'boolean', default: true },
+            isPublished: { type: 'boolean', default: true },
           },
         },
       },
@@ -146,7 +249,7 @@ const swaggerOptions: Options = {
       },
       {
         name: 'Products',
-        description: 'Product management endpoints',
+        description: 'Product management and retrieval endpoints',
       },
     ],
   },

@@ -135,19 +135,20 @@ model SalesOrder {
 }
 
 model SalesOrderDetail {
-  id        String     @id @default(cuid())
-  orderId   String     @map("order_id")
-  productId String     @map("product_id")
-  quantity  Int
-  unitPrice Decimal    @map("unit_price") @db.Decimal(10, 2)
-  subtotal  Decimal    @db.Decimal(10, 2)
-  createdAt DateTime   @default(now()) @map("created_at")
-  createdBy Int?       @map("created_by")
-  updatedAt DateTime   @updatedAt @map("updated_at")
-  updatedBy Int?       @map("updated_by")
-  deletedAt DateTime?  @map("deleted_at")
-  order     SalesOrder @relation(fields: [orderId], references: [id])
-  product   Product    @relation(fields: [productId], references: [id])
+  id                 String     @id @default(cuid())
+  orderId            String     @map("order_id")
+  productId          String     @map("product_id")
+  quantity           Int
+  unitPrice          Decimal    @map("unit_price") @db.Decimal(10, 2)
+  subtotal           Decimal    @db.Decimal(10, 2)
+  totalDepositAmount Decimal    @default(0) @map("total_deposit_amount") @db.Decimal(10, 2)
+  createdAt          DateTime   @default(now()) @map("created_at")
+  createdBy          Int?       @map("created_by")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+  updatedBy          Int?       @map("updated_by")
+  deletedAt          DateTime?  @map("deleted_at")
+  order              SalesOrder @relation(fields: [orderId], references: [id])
+  product            Product    @relation(fields: [productId], references: [id])
 
   @@map("sales_order_details")
 }

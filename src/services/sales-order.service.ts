@@ -1,6 +1,7 @@
 import { db } from '../config/db.config.js';
 import { logger } from '../config/logger.config.js';
 import { Prisma, OrderStatus } from '../generated/prisma/client.js';
+import { cartService } from './cart.service.js';
 
 interface GetVendorOrdersParams {
   vendorId: string;
@@ -128,138 +129,197 @@ export const salesOrderService = {
       // 1. Fetch all cart items for the user
       const cartItems = await db.cart.findMany({
         where: { userId: customerId },
-        include: { product: true },
+        include: { product: { include: { stock: true } } },
       });
 
       if (cartItems.length === 0) {
         throw new Error('Cart is empty');
       }
 
-      // 2. Group items by (vendorId + isService + startDate + endDate)
-      const groups = new Map<
-        string,
-        {
-          vendorId: string;
-          isService: boolean;
-          startDate?: Date;
-          endDate?: Date;
-          items: typeof cartItems;
-        }
-      >();
-
+      // Check stock availability for all items first
       for (const item of cartItems) {
-        const vendorId = item.product.vendorId;
-
-        // Normalize dates
-        let startIso = 'null';
-        let endIso = 'null';
-        let startDateObj: Date | undefined;
-        let endDateObj: Date | undefined;
-
         if (item.isService) {
           if (!item.startDate || !item.endDate) {
-            // Should not happen ideally if validated on cart addition
             throw new Error(
-              `Start and End date required for RENTAL/Service item ${item.productId}`
+              `Start and end date required for rental item: ${item.product.name}`
             );
           }
-          startDateObj = new Date(item.startDate);
-          endDateObj = new Date(item.endDate);
-          startIso = startDateObj.toISOString();
-          endIso = endDateObj.toISOString();
+          const isAvailable = await cartService.checkStockAvailability(
+            item.productId,
+            item.startDate,
+            item.endDate,
+            item.quantity
+          );
+
+          if (!isAvailable) {
+            throw new Error(
+              `Insufficient stock for rental item: ${item.product.name}`
+            );
+          }
+        } else {
+          // Purchase
+          const totalStock = item.product.stock?.totalPhysicalQuantity || 0;
+          if (totalStock < item.quantity) {
+            throw new Error(
+              `Insufficient stock for purchase item: ${item.product.name}`
+            );
+          }
         }
 
-        const key = `${vendorId}-${item.isService}-${startIso}-${endIso}`;
+        // 2. Group items by (vendorId + isService + startDate + endDate)
+        const groups = new Map<
+          string,
+          {
+            vendorId: string;
+            isService: boolean;
+            startDate?: Date;
+            endDate?: Date;
+            items: typeof cartItems;
+          }
+        >();
 
-        if (!groups.has(key)) {
-          groups.set(key, {
-            vendorId,
-            isService: item.isService,
-            startDate: startDateObj!,
-            endDate: endDateObj!,
-            items: [],
-          });
-        }
-        groups.get(key)!.items.push(item);
-      }
+        for (const item of cartItems) {
+          const vendorId = item.product.vendorId;
 
-      // 3. Create Orders for each group
-      const createdOrders = [];
+          // Normalize dates
+          let startIso = 'null';
+          let endIso = 'null';
+          let startDateObj: Date | undefined;
+          let endDateObj: Date | undefined;
 
-      for (const group of groups.values()) {
-        const {
-          vendorId,
-          isService,
-          startDate,
-          endDate,
-          items: groupItems,
-        } = group;
-
-        // Calculate Totals and Details
-        let totalOrderValue = new Prisma.Decimal(0);
-        const orderDetailsData = [];
-
-        let rentalDays = 0;
-        if (isService && startDate && endDate) {
-          const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-          rentalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (rentalDays < 1) rentalDays = 1;
-        }
-
-        for (const item of groupItems) {
-          const product = item.product;
-          const unitPrice = product.dailyPrice;
-          let subtotal = new Prisma.Decimal(0);
-
-          if (isService) {
-            subtotal = unitPrice.mul(item.quantity).mul(rentalDays);
-          } else {
-            // PURCHASE (Not a service)
-            subtotal = unitPrice.mul(item.quantity);
+          if (item.isService) {
+            if (!item.startDate || !item.endDate) {
+              // Should not happen ideally if validated on cart addition
+              throw new Error(
+                `Start and End date required for RENTAL/Service item ${item.productId}`
+              );
+            }
+            startDateObj = new Date(item.startDate);
+            endDateObj = new Date(item.endDate);
+            startIso = startDateObj.toISOString();
+            endIso = endDateObj.toISOString();
           }
 
-          totalOrderValue = totalOrderValue.add(subtotal);
+          const key = `${vendorId}-${item.isService}-${startIso}-${endIso}`;
 
-          orderDetailsData.push({
-            productId: product.id,
-            quantity: item.quantity,
-            unitPrice: unitPrice,
-            subtotal: subtotal,
-          });
+          if (!groups.has(key)) {
+            groups.set(key, {
+              vendorId,
+              isService: item.isService,
+              startDate: startDateObj!,
+              endDate: endDateObj!,
+              items: [],
+            });
+          }
+          groups.get(key)!.items.push(item);
         }
 
-        const initialStatus = !isService
-          ? OrderStatus.APPROVED
-          : OrderStatus.DRAFT;
+        // 3. Create Orders for each group
+        const createdOrders = [];
 
-        const order = await db.salesOrder.create({
-          data: {
-            customerId,
+        for (const group of groups.values()) {
+          const {
             vendorId,
             isService,
-            status: initialStatus,
-            paymentPlan: 'FULL_UPFRONT', // Default
-            totalOrderValue,
-            startDate: startDate || null,
-            endDate: endDate || null,
-            details: {
-              create: orderDetailsData,
+            startDate,
+            endDate,
+            items: groupItems,
+          } = group;
+
+          // Calculate Totals and Details
+          let totalOrderValue = new Prisma.Decimal(0);
+          const orderDetailsData = [];
+
+          let rentalDays = 0;
+          if (isService && startDate && endDate) {
+            const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+            rentalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (rentalDays < 1) rentalDays = 1;
+          }
+
+          for (const item of groupItems) {
+            const product = item.product;
+            const unitPrice = product.dailyPrice;
+            let subtotal = new Prisma.Decimal(0);
+
+            if (isService) {
+              subtotal = unitPrice.mul(item.quantity).mul(rentalDays);
+            } else {
+              // PURCHASE (Not a service)
+              subtotal = unitPrice.mul(item.quantity);
+            }
+
+            const totalDepositAmount = (
+              product.securityDeposit || new Prisma.Decimal(0)
+            ).mul(item.quantity);
+
+            totalOrderValue = totalOrderValue.add(subtotal);
+
+            orderDetailsData.push({
+              productId: product.id,
+              quantity: item.quantity,
+              unitPrice: unitPrice,
+              subtotal: subtotal,
+              totalDepositAmount: totalDepositAmount,
+            });
+          }
+
+          const initialStatus = !isService
+            ? OrderStatus.APPROVED
+            : OrderStatus.DRAFT;
+
+          const order = await db.salesOrder.create({
+            data: {
+              customerId,
+              vendorId,
+              isService,
+              status: initialStatus,
+              paymentPlan: 'FULL_UPFRONT', // Default
+              totalOrderValue,
+              startDate: startDate || null,
+              endDate: endDate || null,
+              details: {
+                create: orderDetailsData,
+              },
             },
-          },
-          include: {
-            details: true,
-          },
+            include: {
+              details: true,
+            },
+          });
+
+          // Handle Stock Deduction for APPROVED Purchase Orders
+          if (initialStatus === OrderStatus.APPROVED && !isService) {
+            for (const item of groupItems) {
+              await db.stock.update({
+                where: { productId: item.productId },
+                data: {
+                  totalPhysicalQuantity: { decrement: item.quantity },
+                },
+              });
+              // Log transaction
+              await db.stockTransaction.create({
+                data: {
+                  productId: item.productId,
+                  orderId: order.id,
+                  moveType: 'SALE',
+                  quantity: item.quantity,
+                  startDate: new Date(),
+                  endDate: new Date(),
+                },
+              });
+            }
+          }
+
+          createdOrders.push(order);
+        }
+        // 4. Clear Cart for User ?? - Usually standard behavior.
+        // Assuming we should clear the cart after successful order creation
+        await db.cart.deleteMany({
+          where: { userId: customerId },
         });
-        createdOrders.push(order);
+
+        return createdOrders;
       }
-
-      // 4. Clear Cart for User ?? - Usually standard behavior.
-      // Assuming we should clear the cart after successful order creation
-      await db.cart.deleteMany({
-        where: { userId: customerId },
-      });
-
-      return createdOrders;
     } catch (error) {
       logger.error('Error in createOrdersFromCart service', error);
       throw error;
@@ -279,9 +339,10 @@ export const salesOrderService = {
     status: OrderStatus;
   }) => {
     try {
-      // 1. Fetch Order
+      // 1. Fetch Order with details to know products
       const order = await db.salesOrder.findUnique({
         where: { id: orderId },
+        include: { details: true },
       });
 
       if (!order) {
@@ -293,7 +354,72 @@ export const salesOrderService = {
         throw new Error('Unauthorized access to this order');
       }
 
-      // 3. Update Status
+      // 3. Handle Stock Deduction if status changing to APPROVED
+      if (
+        status === OrderStatus.APPROVED &&
+        order.status !== OrderStatus.APPROVED
+      ) {
+        if (order.isService && order.startDate && order.endDate) {
+          // RENTAL: Check availability and Reserve
+          for (const detail of order.details) {
+            const isAvailable = await cartService.checkStockAvailability(
+              detail.productId,
+              order.startDate,
+              order.endDate,
+              detail.quantity
+            );
+            if (!isAvailable) {
+              throw new Error(
+                `Insufficient stock to approve order for product ID ${detail.productId}`
+              );
+            }
+          }
+
+          // If all ok, Create Transactions
+          for (const detail of order.details) {
+            await db.stockTransaction.create({
+              data: {
+                productId: detail.productId,
+                orderId: order.id,
+                moveType: 'RENTAL',
+                quantity: detail.quantity,
+                startDate: order.startDate!,
+                endDate: order.endDate!,
+              },
+            });
+          }
+        } else if (!order.isService) {
+          // PURCHASE
+          for (const detail of order.details) {
+            const stock = await db.stock.findUnique({
+              where: { productId: detail.productId },
+            });
+            if (!stock || stock.totalPhysicalQuantity < detail.quantity) {
+              throw new Error(
+                `Insufficient stock to approve purchase for product ID ${detail.productId}`
+              );
+            }
+
+            await db.stock.update({
+              where: { productId: detail.productId },
+              data: { totalPhysicalQuantity: { decrement: detail.quantity } },
+            });
+
+            await db.stockTransaction.create({
+              data: {
+                productId: detail.productId,
+                orderId: order.id,
+                moveType: 'SALE',
+                quantity: detail.quantity,
+                startDate: new Date(),
+                endDate: new Date(),
+              },
+            });
+          }
+        }
+      }
+
+      // 4. Update Status
       const updatedOrder = await db.salesOrder.update({
         where: { id: orderId },
         data: {

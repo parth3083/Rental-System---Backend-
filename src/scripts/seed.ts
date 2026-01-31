@@ -396,6 +396,7 @@ async function seed() {
           quantity: 1,
           unitPrice: 150,
           subtotal: 750, // 5 days
+          totalDepositAmount: 500, // 1 * 500
         },
       }),
       db.salesOrderDetail.create({
@@ -405,6 +406,7 @@ async function seed() {
           quantity: 1,
           unitPrice: 100,
           subtotal: 500, // 5 days
+          totalDepositAmount: 1000, // 1 * 1000
         },
       }),
       // Order 2 details
@@ -415,6 +417,7 @@ async function seed() {
           quantity: 4,
           unitPrice: 25,
           subtotal: 500, // 5 days, 4 chairs
+          totalDepositAmount: 800, // 4 * 200
         },
       }),
       // Order 3 details
@@ -425,6 +428,7 @@ async function seed() {
           quantity: 1,
           unitPrice: 300,
           subtotal: 600, // 2 days
+          totalDepositAmount: 800, // 1 * 800
         },
       }),
       // Order 4 details
@@ -435,6 +439,7 @@ async function seed() {
           quantity: 1,
           unitPrice: 35,
           subtotal: 175, // 5 days
+          totalDepositAmount: 150, // 1 * 150
         },
       }),
     ]);

@@ -15,6 +15,7 @@ interface SeedUser {
   role: UsersRole;
   companyName?: string;
   gstin?: string;
+  productCategory?: string;
 }
 
 const seedUsers: SeedUser[] = [

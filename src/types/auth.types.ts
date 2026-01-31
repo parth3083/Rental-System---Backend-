@@ -7,12 +7,29 @@ export interface JwtPayload {
   role: UsersRole;
 }
 
-export interface RegisterInput {
-  username: string;
+// Customer registration input (firstName + lastName will be concatenated to fullName)
+export interface CustomerRegisterInput {
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
-  role?: UsersRole;
+  role: 'CUSTOMER';
 }
+
+// Vendor registration input with additional fields
+export interface VendorRegisterInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  role: 'VENDOR';
+  companyName: string;
+  productCategory: string;
+  gstNumber: string;
+}
+
+// Combined register input type
+export type RegisterInput = CustomerRegisterInput | VendorRegisterInput;
 
 export interface LoginInput {
   email: string;

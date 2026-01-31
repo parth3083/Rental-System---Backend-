@@ -15,9 +15,6 @@ model Users {
   role         UsersRole    @default(CUSTOMER)
   companyName  String?      @map("company_name") @db.VarChar(255)
   gstin        String?      @unique @db.VarChar(15)
-  address      String?
-  city         String?
-  pincode      String?
   createdAt    DateTime     @default(now()) @map("created_at")
   createdBy    String?      @map("created_by")
   updatedAt    DateTime     @updatedAt @map("updated_at")
@@ -25,6 +22,9 @@ model Users {
   deletedAt    DateTime?    @map("deleted_at")
   isDeleted    Boolean      @default(false) @map("is_deleted")
   isRestricted Boolean      @default(false) @map("is_restricted")
+  address      String?
+  city         String?
+  pincode      String?
   products     Product[]
   orders       SalesOrder[] @relation("CustomerOrders")
   vendorOrders SalesOrder[] @relation("VendorOrders")
@@ -48,12 +48,8 @@ model Product {
   color              String
   imageUrl           String
   description        String?
-  hourlyPrice        Decimal?           @map("hourly_price") @db.Decimal(10, 2)
   dailyPrice         Decimal
-  weeklyPrice        Decimal?           @map("weekly_price") @db.Decimal(10, 2)
-  monthlyPrice       Decimal?           @map("monthly_price") @db.Decimal(10, 2)
   discountPercentage Int                @default(0)
-  taxPercentage      Decimal            @default(0) @map("tax_percentage") @db.Decimal(5, 2)
   securityDeposit    Decimal?           @map("security_deposit") @db.Decimal(10, 2)
   isAvailable        Boolean            @default(true)
   isPublished        Boolean            @default(false) @map("is_published")
@@ -62,8 +58,12 @@ model Product {
   createdBy          Int?               @map("created_by")
   updatedAt          DateTime           @updatedAt @map("updated_at")
   updatedBy          Int?               @map("updated_by")
-  isDeleted          Boolean            @default(false) @map("is_deleted")
   deletedAt          DateTime?          @map("deleted_at")
+  hourlyPrice        Decimal?           @map("hourly_price") @db.Decimal(10, 2)
+  monthlyPrice       Decimal?           @map("monthly_price") @db.Decimal(10, 2)
+  weeklyPrice        Decimal?           @map("weekly_price") @db.Decimal(10, 2)
+  taxPercentage      Decimal            @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  isDeleted          Boolean            @default(false) @map("is_deleted")
   category           Category           @relation(fields: [categoryId], references: [id])
   vendor             Users              @relation(fields: [vendorId], references: [id])
   salesOrderDetails  SalesOrderDetail[]
@@ -107,9 +107,6 @@ model SalesOrder {
   id              String             @id @default(cuid())
   customerId      String             @map("customer_id")
   vendorId        String             @map("vendor_id")
-  address         String?
-  city            String?
-  pincode         String?
   status          OrderStatus        @default(DRAFT)
   paymentPlan     PaymentPlan        @map("payment_plan")
   totalOrderValue Decimal            @map("total_order_value") @db.Decimal(10, 2)
@@ -120,6 +117,9 @@ model SalesOrder {
   updatedAt       DateTime           @updatedAt @map("updated_at")
   updatedBy       Int?               @map("updated_by")
   deletedAt       DateTime?          @map("deleted_at")
+  address         String?
+  city            String?
+  pincode         String?
   paymentLedgers  PaymentLedger[]
   invoices        SalesInvoice[]
   customer        Users              @relation("CustomerOrders", fields: [customerId], references: [id])

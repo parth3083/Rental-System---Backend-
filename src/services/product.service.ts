@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import type {
   GetProductsRequest,
   ProductCardDto,
+  ProductDetailDto,
   PagedResult,
 } from '../types/product.types.js';
 import type {
@@ -152,6 +153,73 @@ class ProductService {
       };
     } catch (error) {
       logger.error('Get products service error:', error);
+      throw error;
+    }
+  }
+
+  async getProductById(productId: string): Promise<ProductDetailDto> {
+    try {
+      const product = await db.product.findUnique({
+        where: { id: productId },
+        include: {
+          category: true,
+          vendor: true,
+          stock: true,
+        },
+      });
+
+      if (!product || product.isDeleted) {
+        throw new Error('Product not found');
+      }
+
+      return {
+        id: product.id,
+        vendorId: product.vendorId,
+        name: product.name,
+        brand: product.brand,
+        color: product.color,
+        imageUrl: product.imageUrl,
+        description: product.description,
+
+        dailyPrice: Number(product.dailyPrice),
+        hourlyPrice: product.hourlyPrice ? Number(product.hourlyPrice) : null,
+        weeklyPrice: product.weeklyPrice ? Number(product.weeklyPrice) : null,
+        monthlyPrice: product.monthlyPrice
+          ? Number(product.monthlyPrice)
+          : null,
+
+        discountPercentage: product.discountPercentage,
+        taxPercentage: Number(product.taxPercentage),
+        securityDeposit: product.securityDeposit
+          ? Number(product.securityDeposit)
+          : null,
+
+        isAvailable: product.isAvailable,
+        isPublished: product.isPublished,
+        categoryId: product.categoryId,
+
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+
+        category: {
+          id: product.category.id,
+          name: product.category.name,
+        },
+
+        vendor: {
+          id: product.vendor.id,
+          name: product.vendor.name,
+          companyName: product.vendor.companyName,
+        },
+
+        stock: product.stock
+          ? {
+              totalPhysicalQuantity: product.stock.totalPhysicalQuantity,
+            }
+          : null,
+      };
+    } catch (error) {
+      logger.error('Get product by id service error:', error);
       throw error;
     }
   }

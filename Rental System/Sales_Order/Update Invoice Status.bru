@@ -1,0 +1,21 @@
+meta {
+  name: Update Invoice Status
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{Baseurl}}/api/sales-orders/invoice/cml2j5gff000z5wp6nx9119u4/status
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "status": "DISPATCHED"
+  }
+}

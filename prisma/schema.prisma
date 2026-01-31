@@ -20,15 +20,15 @@ model Users {
   updatedAt    DateTime     @updatedAt @map("updated_at")
   updatedBy    String?      @map("updated_by")
   deletedAt    DateTime?    @map("deleted_at")
-  isDeleted    Boolean      @default(false) @map("is_deleted")
-  isRestricted Boolean      @default(false) @map("is_restricted")
   address      String?
   city         String?
+  isDeleted    Boolean      @default(false) @map("is_deleted")
+  isRestricted Boolean      @default(false) @map("is_restricted")
   pincode      String?
   products     Product[]
+  cart         Cart[]
   orders       SalesOrder[] @relation("CustomerOrders")
   vendorOrders SalesOrder[] @relation("VendorOrders")
-  cart         Cart[]
 
   @@map("users")
 }
@@ -61,16 +61,16 @@ model Product {
   updatedBy          Int?               @map("updated_by")
   deletedAt          DateTime?          @map("deleted_at")
   hourlyPrice        Decimal?           @map("hourly_price") @db.Decimal(10, 2)
-  monthlyPrice       Decimal?           @map("monthly_price") @db.Decimal(10, 2)
-  weeklyPrice        Decimal?           @map("weekly_price") @db.Decimal(10, 2)
-  taxPercentage      Decimal            @default(0) @map("tax_percentage") @db.Decimal(5, 2)
   isDeleted          Boolean            @default(false) @map("is_deleted")
+  monthlyPrice       Decimal?           @map("monthly_price") @db.Decimal(10, 2)
+  taxPercentage      Decimal            @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  weeklyPrice        Decimal?           @map("weekly_price") @db.Decimal(10, 2)
   category           Category           @relation(fields: [categoryId], references: [id])
   vendor             Users              @relation(fields: [vendorId], references: [id])
+  cartItems          Cart[]
   salesOrderDetails  SalesOrderDetail[]
   stock              Stock?
   stockTransactions  StockTransaction[]
-  cartItems          Cart[]
 }
 
 model Stock {
@@ -109,11 +109,12 @@ model SalesOrder {
   id              String             @id @default(cuid())
   customerId      String             @map("customer_id")
   vendorId        String             @map("vendor_id")
+  isService       Boolean            @default(true) @map("is_service")
   status          OrderStatus        @default(DRAFT)
   paymentPlan     PaymentPlan        @map("payment_plan")
   totalOrderValue Decimal            @map("total_order_value") @db.Decimal(10, 2)
-  startDate       DateTime           @map("start_date")
-  endDate         DateTime           @map("end_date")
+  startDate       DateTime?          @map("start_date")
+  endDate         DateTime?          @map("end_date")
   createdAt       DateTime           @default(now()) @map("created_at")
   createdBy       Int?               @map("created_by")
   updatedAt       DateTime           @updatedAt @map("updated_at")
@@ -184,6 +185,23 @@ model PaymentLedger {
   @@map("payment_ledger")
 }
 
+model Cart {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  productId String    @map("product_id")
+  quantity  Int
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  endDate   DateTime? @map("end_date")
+  startDate DateTime? @map("start_date")
+  isService Boolean   @default(true) @map("is_service")
+  product   Product   @relation(fields: [productId], references: [id])
+  user      Users     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, productId])
+  @@map("cart")
+}
+
 enum UsersRole {
   ADMIN
   VENDOR
@@ -209,22 +227,4 @@ enum DeliveryStatus {
   DISPATCHED
   DELIVERED
   RETURNED
-}
-
-model Cart {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  productId String   @map("product_id")
-  quantity  Int
-  startDate DateTime? @map("start_date")
-  endDate   DateTime? @map("end_date")
-  isService Boolean   @default(true) @map("is_service")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user    Users   @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
-
-  @@unique([userId, productId])
-  @@map("cart")
 }

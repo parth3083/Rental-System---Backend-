@@ -3,7 +3,7 @@ import { logger } from '../config/logger.config.js';
 
 const APP_NAME = process.env.APP_NAME || 'Odoo Rental Platform';
 
-/**
+/*
  * Send a general email
  */
 export async function sendEmail(

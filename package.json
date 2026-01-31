@@ -15,7 +15,10 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "seed": "pnpm run build && node dist/scripts/seed.js"
+    "seed": "pnpm run build && node dist/scripts/seed.js",
+    "generate": "npx prisma generate",
+    "migrate": "npx prisma migrate",
+    "studio": "npx prisma studio"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +27,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@upstash/redis": "^1.36.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

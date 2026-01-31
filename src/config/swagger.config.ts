@@ -110,12 +110,43 @@ const swaggerOptions: Options = {
             },
           },
         },
+        ProductCardDto: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' },
+            name: { type: 'string' },
+            brand: { type: 'string' },
+            imageUrl: { type: 'string' },
+            color: { type: 'string' },
+            priceLabel: { type: 'string' },
+            originalPrice: { type: 'number', format: 'double' },
+            finalPrice: { type: 'number', format: 'double' },
+            discountPercentage: { type: 'integer' },
+            isAvailable: { type: 'boolean' },
+          },
+        },
+        PagedProductResult: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ProductCardDto' },
+            },
+            totalCount: { type: 'integer' },
+            pageNumber: { type: 'integer' },
+            pageSize: { type: 'integer' },
+          },
+        },
       },
     },
     tags: [
       {
         name: 'Auth',
         description: 'Authentication and authorization endpoints',
+      },
+      {
+        name: 'Products',
+        description: 'Product management endpoints',
       },
     ],
   },

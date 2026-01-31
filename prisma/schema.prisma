@@ -145,10 +145,10 @@ model SalesOrderDetail {
   updatedAt          DateTime   @updatedAt @map("updated_at")
   updatedBy          Int?       @map("updated_by")
   deletedAt          DateTime?  @map("deleted_at")
-  end_date   DateTime?
-  start_date DateTime?
-  order      SalesOrder @relation(fields: [orderId], references: [id])
-  product    Product    @relation(fields: [productId], references: [id])
+  end_date           DateTime?
+  start_date         DateTime?
+  order              SalesOrder @relation(fields: [orderId], references: [id])
+  product            Product    @relation(fields: [productId], references: [id])
 
   @@map("sales_order_details")
 }

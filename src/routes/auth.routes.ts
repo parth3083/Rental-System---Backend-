@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authController } from '../controllers/auth.controller.js';
 import { authMiddleware, adminOnly } from '../middleware/auth.middleware.js';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * @swagger

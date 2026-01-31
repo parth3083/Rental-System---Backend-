@@ -340,8 +340,6 @@ async function seed() {
           status: 'CONFIRMED' as OrderStatus,
           paymentPlan: 'FULL_UPFRONT' as PaymentPlan,
           totalOrderValue: 1250,
-          startDate: new Date('2026-02-01'),
-          endDate: new Date('2026-02-05'),
         },
       }),
       // Order 2: Customer 2 renting from Vendor 2 (Furniture)
@@ -352,8 +350,6 @@ async function seed() {
           status: 'APPROVED' as OrderStatus,
           paymentPlan: 'PARTIAL_MONTHLY' as PaymentPlan,
           totalOrderValue: 500,
-          startDate: new Date('2026-02-10'),
-          endDate: new Date('2026-02-15'),
         },
       }),
       // Order 3: Customer 1 renting party equipment
@@ -364,8 +360,6 @@ async function seed() {
           status: 'DRAFT' as OrderStatus,
           paymentPlan: 'FULL_UPFRONT' as PaymentPlan,
           totalOrderValue: 600,
-          startDate: new Date('2026-03-01'),
-          endDate: new Date('2026-03-02'),
         },
       }),
       // Order 4: Completed order
@@ -376,8 +370,6 @@ async function seed() {
           status: 'CONFIRMED' as OrderStatus,
           paymentPlan: 'FULL_UPFRONT' as PaymentPlan,
           totalOrderValue: 175,
-          startDate: new Date('2026-01-20'),
-          endDate: new Date('2026-01-25'),
         },
       }),
     ]);
@@ -396,6 +388,9 @@ async function seed() {
           quantity: 1,
           unitPrice: 150,
           subtotal: 750, // 5 days
+          totalDepositAmount: 500, // 1 * 500
+          start_date: new Date('2026-02-01'),
+          end_date: new Date('2026-02-05'),
         },
       }),
       db.salesOrderDetail.create({
@@ -405,6 +400,9 @@ async function seed() {
           quantity: 1,
           unitPrice: 100,
           subtotal: 500, // 5 days
+          totalDepositAmount: 1000, // 1 * 1000
+          start_date: new Date('2026-02-01'),
+          end_date: new Date('2026-02-05'),
         },
       }),
       // Order 2 details
@@ -415,6 +413,9 @@ async function seed() {
           quantity: 4,
           unitPrice: 25,
           subtotal: 500, // 5 days, 4 chairs
+          totalDepositAmount: 800, // 4 * 200
+          start_date: new Date('2026-02-10'),
+          end_date: new Date('2026-02-15'),
         },
       }),
       // Order 3 details
@@ -425,6 +426,9 @@ async function seed() {
           quantity: 1,
           unitPrice: 300,
           subtotal: 600, // 2 days
+          totalDepositAmount: 800, // 1 * 800
+          start_date: new Date('2026-03-01'),
+          end_date: new Date('2026-03-02'),
         },
       }),
       // Order 4 details
@@ -435,6 +439,9 @@ async function seed() {
           quantity: 1,
           unitPrice: 35,
           subtotal: 175, // 5 days
+          totalDepositAmount: 150, // 1 * 150
+          start_date: new Date('2026-01-20'),
+          end_date: new Date('2026-01-25'),
         },
       }),
     ]);

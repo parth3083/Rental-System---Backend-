@@ -61,6 +61,8 @@ async function seed() {
   try {
     // Clear existing data in proper order (respect foreign key constraints)
     logger.info('Clearing existing data...');
+    await db.wishlist.deleteMany({});
+    await db.cart.deleteMany({});
     await db.paymentLedger.deleteMany({});
     await db.salesInvoice.deleteMany({});
     await db.salesOrderDetail.deleteMany({});
@@ -524,6 +526,54 @@ async function seed() {
     logger.info(`✅ Created ${payments.length} payment ledger entries`);
 
     // =====================
+    // 10. Create cart items
+    // =====================
+    logger.info('Creating cart items...');
+    const cartItems = await Promise.all([
+      db.cart.create({
+        data: {
+          userId: customer1Id,
+          productId: products[3].id, // Office chair
+          quantity: 2,
+          startDate: new Date('2026-02-20'),
+          endDate: new Date('2026-02-22'),
+          isService: true,
+        },
+      }),
+      db.cart.create({
+        data: {
+          userId: customer2Id,
+          productId: products[5].id, // Electric Scooter
+          quantity: 1,
+          startDate: new Date('2026-03-01'),
+          endDate: new Date('2026-03-05'),
+          isService: true,
+        },
+      }),
+    ]);
+    logger.info(`✅ Created ${cartItems.length} cart items`);
+
+    // =====================
+    // 11. Create wishlist items
+    // =====================
+    logger.info('Creating wishlist items...');
+    const wishlistItems = await Promise.all([
+      db.wishlist.create({
+        data: {
+          userId: customer1Id,
+          productId: products[2].id, // DJ System
+        },
+      }),
+      db.wishlist.create({
+        data: {
+          userId: customer2Id,
+          productId: products[1].id, // MacBook
+        },
+      }),
+    ]);
+    logger.info(`✅ Created ${wishlistItems.length} wishlist items`);
+
+    // =====================
     // Summary
     // =====================
     logger.info('');
@@ -539,7 +589,10 @@ async function seed() {
     logger.info(`   Sales Orders:       ${salesOrders.length}`);
     logger.info(`   Order Details:      ${orderDetails.length}`);
     logger.info(`   Invoices:           ${invoices.length}`);
+    logger.info(`   Invoices:           ${invoices.length}`);
     logger.info(`   Payment Entries:    ${payments.length}`);
+    logger.info(`   Cart Items:         ${cartItems.length}`);
+    logger.info(`   Wishlist Items:     ${wishlistItems.length}`);
     logger.info('');
     logger.info('🔐 Test Credentials:');
     logger.info('====================');

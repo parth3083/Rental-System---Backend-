@@ -35,32 +35,28 @@ export const cartService = {
     endDate: Date,
     requestedQuantity: number
   ) => {
-    // 1. Get Total Stock
+    // 1. Get Total Stock from Inventory Table
     const stock = await db.stock.findUnique({
       where: { productId },
     });
     const totalStock = stock?.totalPhysicalQuantity || 0;
 
-    // 2. Count booked quantity from active orders
-    const busyLineItems = await db.salesOrderDetail.findMany({
+    // 2. Count how many items are currently busy during the requested time
+    const bookedTransactions = await db.stockTransaction.findMany({
       where: {
         productId,
-        order: {
-          status: {
-            notIn: ['CANCELLED', 'REJECTED'],
-          },
-          startDate: { lt: endDate },
-          endDate: { gt: startDate },
-        },
+        deletedAt: null, // Only active transactions
+        startDate: { lt: endDate }, // Overlap check
+        endDate: { gt: startDate },
       },
     });
 
-    const bookedQuantity = busyLineItems.reduce(
+    const bookedQuantity = bookedTransactions.reduce(
       (acc, item) => acc + item.quantity,
       0
     );
 
-    // 3. Compare
+    // 3. The Math
     const availableStock = totalStock - bookedQuantity;
     return availableStock >= requestedQuantity;
   },

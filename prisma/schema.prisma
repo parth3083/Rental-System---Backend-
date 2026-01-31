@@ -27,6 +27,7 @@ model Users {
   pincode      String?
   products     Product[]
   cart         Cart[]
+  wishlist     Wishlist[]
   orders       SalesOrder[] @relation("CustomerOrders")
   vendorOrders SalesOrder[] @relation("VendorOrders")
 
@@ -68,6 +69,7 @@ model Product {
   category           Category           @relation(fields: [categoryId], references: [id])
   vendor             Users              @relation(fields: [vendorId], references: [id])
   cartItems          Cart[]
+  wishlistItems      Wishlist[]
   salesOrderDetails  SalesOrderDetail[]
   stock              Stock?
   stockTransactions  StockTransaction[]
@@ -109,7 +111,6 @@ model SalesOrder {
   id              String             @id @default(cuid())
   customerId      String             @map("customer_id")
   vendorId        String             @map("vendor_id")
-  isService       Boolean            @default(true) @map("is_service")
   status          OrderStatus        @default(DRAFT)
   paymentPlan     PaymentPlan        @map("payment_plan")
   totalOrderValue Decimal            @map("total_order_value") @db.Decimal(10, 2)
@@ -123,6 +124,7 @@ model SalesOrder {
   address         String?
   city            String?
   pincode         String?
+  isService       Boolean            @default(true) @map("is_service")
   paymentLedgers  PaymentLedger[]
   invoices        SalesInvoice[]
   customer        Users              @relation("CustomerOrders", fields: [customerId], references: [id])
@@ -227,4 +229,18 @@ enum DeliveryStatus {
   DISPATCHED
   DELIVERED
   RETURNED
+}
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    Users   @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@map("wishlist")
 }

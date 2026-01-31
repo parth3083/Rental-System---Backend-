@@ -28,6 +28,7 @@ model Users {
   products     Product[]
   orders       SalesOrder[] @relation("CustomerOrders")
   vendorOrders SalesOrder[] @relation("VendorOrders")
+  cart         Cart[]
 
   @@map("users")
 }
@@ -69,6 +70,7 @@ model Product {
   salesOrderDetails  SalesOrderDetail[]
   stock              Stock?
   stockTransactions  StockTransaction[]
+  cartItems          Cart[]
 }
 
 model Stock {
@@ -207,4 +209,22 @@ enum DeliveryStatus {
   DISPATCHED
   DELIVERED
   RETURNED
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  quantity  Int
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+  isService Boolean   @default(true) @map("is_service")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    Users   @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@map("cart")
 }

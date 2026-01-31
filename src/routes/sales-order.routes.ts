@@ -5,7 +5,7 @@ import {
   roleMiddleware,
 } from '../middleware/auth.middleware.js';
 
-const router = Router();
+const router: Router = Router();
 
 // Route to get sales orders for vendors
 // Verifies token and checks if role is VENDOR

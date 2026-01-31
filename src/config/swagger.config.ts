@@ -240,6 +240,30 @@ const swaggerOptions: Options = {
             isPublished: { type: 'boolean', default: true },
           },
         },
+        CartItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            userId: { type: 'string' },
+            productId: { type: 'string' },
+            quantity: { type: 'integer' },
+            startDate: { type: 'string', format: 'date-time' },
+            endDate: { type: 'string', format: 'date-time' },
+            product: { $ref: '#/components/schemas/ProductCardDto' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AddToCartRequest: {
+          type: 'object',
+          required: ['productId', 'quantity', 'startDate', 'endDate'],
+          properties: {
+            productId: { type: 'string' },
+            quantity: { type: 'integer', minimum: 1 },
+            startDate: { type: 'string', format: 'date-time' },
+            endDate: { type: 'string', format: 'date-time' },
+          },
+        },
       },
     },
     tags: [
@@ -250,6 +274,10 @@ const swaggerOptions: Options = {
       {
         name: 'Products',
         description: 'Product management and retrieval endpoints',
+      },
+      {
+        name: 'Cart',
+        description: 'Shopping cart management endpoints',
       },
     ],
   },

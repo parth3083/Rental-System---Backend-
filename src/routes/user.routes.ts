@@ -14,6 +14,9 @@ const router: Router = Router();
 // All routes require authentication
 router.use(authMiddleware);
 
+// GET /api/users - Get all users (Admin/Vendor only)
+router.get('/', userController.getAllUsers);
+
 // GET /api/users/me - Get current user details
 router.get('/me', userController.getUserDetails);
 

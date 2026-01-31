@@ -6,7 +6,8 @@ import type {
 } from '../validations/user.validation.js';
 import { logger } from '../config/logger.config.js';
 import { redisService, type CachedUserData } from './redis.service.js';
-import type { UsersRole } from '../generated/prisma/client.js';
+import type { UsersRole, Prisma } from '../generated/prisma/client.js';
+import type { GetUsersRequest, PagedResult } from '../types/user.types.js';
 
 /**
  * User details response interface
@@ -35,6 +36,78 @@ export interface ServiceResponse<T = unknown> {
 }
 
 class UserService {
+  /**
+   * Get all users with search and pagination
+   * - ADMIN: Can see all users
+   * - VENDOR: Can only see CUSTOMERS
+   */
+  async getAllUsers(
+    params: GetUsersRequest,
+    requestingRole: UsersRole
+  ): Promise<PagedResult<UserDetailsResponse>> {
+    try {
+      const { searchTerm, pageNumber = 1, pageSize = 10 } = params;
+
+      // Build Prisma Where Clause
+      const where: Prisma.UsersWhereInput = {
+        isDeleted: false,
+      };
+
+      // Role-based filtering
+      if (requestingRole === 'VENDOR') {
+        // Vendor can only see CUSTOMERS
+        where.role = 'CUSTOMER';
+      }
+      // ADMIN sees all (no extra filter)
+
+      // Search functionality
+      if (searchTerm) {
+        where.OR = [
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
+        ];
+      }
+
+      // Execute Query
+      const [totalCount, users] = await Promise.all([
+        db.users.count({ where }),
+        db.users.findMany({
+          where,
+          skip: (pageNumber - 1) * pageSize,
+          take: pageSize,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            address: true,
+            city: true,
+            pincode: true,
+            companyName: true,
+            gstin: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      // Map Results
+      const items = users.map(user =>
+        this.filterUserDetailsByRole(user, requestingRole)
+      );
+
+      return {
+        items,
+        totalCount,
+        pageNumber,
+        pageSize,
+      };
+    } catch (error) {
+      logger.error('Get all users service error:', error);
+      throw error;
+    }
+  }
   /**
    * Get user details by ID with role-based data filtering
    * 1. First try to fetch from Redis cache

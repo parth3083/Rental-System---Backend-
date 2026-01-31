@@ -4,10 +4,113 @@ import {
   updateUserSchema,
   changePasswordSchema,
 } from '../validations/user.validation.js';
+import type { GetUsersRequest } from '../types/user.types.js';
 import { logger } from '../config/logger.config.js';
 import { ZodError } from 'zod';
 
 class UserController {
+  /**
+   * @swagger
+   * /api/users:
+   *   get:
+   *     summary: Get all users (Admin/Vendor only)
+   *     description: Retrieve a paginated list of users. Admins can see all users. Vendors can only see customers. Supports search by name or email.
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: search
+   *         schema:
+   *           type: string
+   *         description: Search term for name or email
+   *       - in: query
+   *         name: page
+   *         schema:
+   *           type: integer
+   *           default: 1
+   *         description: Page number
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           default: 10
+   *         description: Number of items per page
+   *     responses:
+   *       200:
+   *         description: Users retrieved successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Users retrieved successfully
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     items:
+   *                       type: array
+   *                       items:
+   *                         $ref: '#/components/schemas/UserDetailsResponse'
+   *                     totalCount:
+   *                       type: integer
+   *                     pageNumber:
+   *                       type: integer
+   *                     pageSize:
+   *                       type: integer
+   *       401:
+   *         description: Unauthorized
+   *       403:
+   *         description: Forbidden - Customers cannot access this
+   *       500:
+   *         description: Internal server error
+   */
+  async getAllUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const userRole = req.user?.role;
+
+      // Only ADMIN and VENDOR can access this list
+      // CUSTOMERs should not be able to list users
+      if (!userRole || (userRole !== 'ADMIN' && userRole !== 'VENDOR')) {
+        res.status(403).json({
+          success: false,
+          message: 'Forbidden: You do not have permission to view users',
+        });
+        return;
+      }
+
+      const { search, page, limit } = req.query;
+
+      const params: GetUsersRequest = {
+        pageNumber: page ? Number(page) : 1,
+        pageSize: limit ? Number(limit) : 10,
+      };
+
+      if (search) {
+        params.searchTerm = String(search);
+      }
+
+      const result = await userService.getAllUsers(params, userRole);
+
+      res.status(200).json({
+        success: true,
+        message: 'Users retrieved successfully',
+        data: result,
+      });
+    } catch (error) {
+      logger.error('Get all users controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
   /**
    * @swagger
    * /api/users/me:

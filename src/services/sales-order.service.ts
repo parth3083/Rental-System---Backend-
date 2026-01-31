@@ -63,6 +63,11 @@ export const salesOrderService = {
                 createdAt: 'desc',
               },
             },
+            details: {
+              select: {
+                end_date: true,
+              },
+            },
             paymentLedgers: {
               select: {
                 amountPaid: true,
@@ -95,6 +100,20 @@ export const salesOrderService = {
         const invoice = order.invoices[0];
         const status = invoice ? invoice.deliveryStatus : order.status;
 
+        // Check for expiration
+        const today = new Date();
+        let message = null;
+
+        const hasExpiredItem = order.details.some(detail => {
+          if (!detail.end_date) return false;
+          return new Date(detail.end_date) < today;
+        });
+
+        if (hasExpiredItem) {
+          message =
+            'Due date has expired please return your product or late fee will apply';
+        }
+
         return {
           id: order.id,
           customer: order.customer,
@@ -104,6 +123,7 @@ export const salesOrderService = {
           created_at: order.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
           payment_amount_pending: pendingAmount,
           invoice_number: invoice?.invoiceNumber || null,
+          message: message,
         };
       });
 
@@ -412,6 +432,105 @@ export const salesOrderService = {
       return updatedOrder;
     } catch (error) {
       logger.error('Error in updateOrderStatus service', error);
+      throw error;
+    }
+  },
+
+  calculateReturn: async (orderId: string) => {
+    try {
+      // 1. Fetch Order and related data
+      const order = await db.salesOrder.findUnique({
+        where: { id: orderId },
+        include: {
+          invoices: true,
+          paymentLedgers: true,
+          details: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // 2. Fetch/Calculate Grand Total from Invoice
+      // Assuming one invoice per order for now or taking the latest/active one.
+      // The prompt says "grandtotal from sales_invoice table for that orderID".
+      // Let's assume the sum of all invoices or just the single main invoice.
+      // Usually there is one main invoice.
+      const grandTotal = order.invoices.reduce((sum, invoice) => {
+        return sum.add(new Prisma.Decimal(invoice.grandTotal));
+      }, new Prisma.Decimal(0));
+
+      // 3. Fetch/Calculate Total Amount Paid from Payment Ledger
+      const totalPaid = order.paymentLedgers.reduce((sum, ledger) => {
+        return sum.add(new Prisma.Decimal(ledger.amountPaid));
+      }, new Prisma.Decimal(0));
+
+      // 4. Fetch/Calculate Total Deposit and Late Fees from Order Details
+      let totalDeposit = new Prisma.Decimal(0);
+      let totalLateFee = new Prisma.Decimal(0);
+      const today = new Date();
+
+      for (const detail of order.details) {
+        // Aggregate Deposit
+        if (detail.totalDepositAmount) {
+          totalDeposit = totalDeposit.add(
+            new Prisma.Decimal(detail.totalDepositAmount)
+          );
+        }
+
+        // Calculate Late Fee if applicable
+        if (detail.end_date) {
+          const endDate = new Date(detail.end_date);
+          if (today > endDate) {
+            const diffTime = Math.abs(today.getTime() - endDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // delta of today - enddate (in days)
+
+            // late fee = base * quantity * delta
+            // base = unitPrice (as per prompt)
+            const unitPrice = new Prisma.Decimal(detail.unitPrice);
+            const quantity = new Prisma.Decimal(detail.quantity);
+            const lateFee = unitPrice.mul(quantity).mul(diffDays);
+
+            totalLateFee = totalLateFee.add(lateFee);
+          }
+        }
+      }
+
+      // 5. Final Calculation
+      // final payment = deposit + totalPaid - grandtotal (Initial logic)
+      // final payment = final payment - latefee
+
+      // Using Prisma Decimal for precision
+      let finalPayment = totalDeposit.add(totalPaid).sub(grandTotal);
+      finalPayment = finalPayment.sub(totalLateFee);
+
+      // 6. Update Invoice Status to COMPLETED if not already
+      // The prompt says: "just before sending the final payload we change the delevery Status in sales_invoice table to COMPLETED"
+      // We need to update all associated invoices or the main one.
+      // Assuming we update all related invoices.
+
+      // We need to use updateMany or iterate. Prism's updateMany updates multiple.
+      await db.salesInvoice.updateMany({
+        where: {
+          orderId: orderId,
+        },
+        data: {
+          deliveryStatus: 'COMPLETED', // Use string literal or enum from client. Enum is safer but string works if typed correctly.
+        },
+      });
+
+      return {
+        orderId,
+        grandTotal: Number(grandTotal),
+        totalPaid: Number(totalPaid),
+        totalDeposit: Number(totalDeposit),
+        totalLateFee: Number(totalLateFee),
+        finalPayment: Number(finalPayment),
+      };
+    } catch (error) {
+      logger.error('Error in calculateReturn service', error);
       throw error;
     }
   },

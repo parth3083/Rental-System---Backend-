@@ -243,4 +243,5 @@ enum DeliveryStatus {
   DISPATCHED
   DELIVERED
   RETURNED
+  COMPLETED
 }

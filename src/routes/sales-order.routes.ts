@@ -44,4 +44,12 @@ router.patch(
   salesOrderController.updateOrderStatus
 );
 
+// Route to get return calculation summary
+router.get(
+  '/:orderId/return-summary',
+  authMiddleware,
+  roleMiddleware('VENDOR'), // Assuming Vendor performs return check
+  salesOrderController.calculateReturn
+);
+
 export default router;

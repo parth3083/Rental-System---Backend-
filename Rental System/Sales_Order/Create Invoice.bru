@@ -1,0 +1,21 @@
+meta {
+  name: Create Invoice
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{Baseurl}}/api/sales-orders/invoice
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "orderId": "cm6l6s738000bu803w7df0q8l"
+  }
+}

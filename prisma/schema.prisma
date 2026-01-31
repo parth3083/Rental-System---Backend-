@@ -219,3 +219,32 @@ model PaymentLedger {
 
   @@map("payment_ledger")
 }
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  brand       String
+  color       String
+  imageUrl    String
+  description String?
+
+  // Base price is per day as per implication
+  dailyPrice         Decimal
+  discountPercentage Int     @default(0)
+
+  isAvailable Boolean @default(true)
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

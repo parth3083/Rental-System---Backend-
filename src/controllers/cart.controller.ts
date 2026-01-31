@@ -12,23 +12,19 @@ export const cartController = {
       const isServiceBool = isService !== false;
 
       if (!productId || typeof quantity !== 'number') {
-        res
-          .status(400)
-          .json({
-            success: false,
-            message: 'Product ID and quantity are required',
-          });
+        res.status(400).json({
+          success: false,
+          message: 'Product ID and quantity are required',
+        });
         return;
       }
 
       if (isServiceBool) {
         if (!startDate || !endDate) {
-          res
-            .status(400)
-            .json({
-              success: false,
-              message: 'Start date and end date are required for service items',
-            });
+          res.status(400).json({
+            success: false,
+            message: 'Start date and end date are required for service items',
+          });
           return;
         }
       }
@@ -44,12 +40,10 @@ export const cartController = {
       res.status(200).json({ success: true, data: cartItem });
     } catch (error: any) {
       logger.error('Error adding to cart:', error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: error.message || 'Internal server error',
-        });
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
     }
   },
 
@@ -60,12 +54,10 @@ export const cartController = {
       res.status(200).json({ success: true, data: cartItems });
     } catch (error: any) {
       logger.error('Error getting cart:', error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: error.message || 'Internal server error',
-        });
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
     }
   },
 
@@ -93,12 +85,10 @@ export const cartController = {
         .json({ success: true, message: 'Item removed from cart' });
     } catch (error: any) {
       logger.error('Error removing from cart:', error);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: error.message || 'Internal server error',
-        });
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
     }
   },
 };

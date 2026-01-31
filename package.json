@@ -18,6 +18,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -29,8 +31,10 @@
     "jsonwebtoken": "^9.0.3",
     "lint-staged": "^16.2.7",
     "morgan": "^1.10.1",
+    "pg": "^8.18.0",
     "prettier": "^3.8.1",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -40,9 +44,12 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
+    "@types/node": "^25.1.0",
+    "@types/pg": "^8.16.0",
     "@types/winston": "^2.4.4",
     "husky": "^9.1.7",
     "jiti": "^2.6.1",
+    "prisma": "^7.3.0",
     "typescript-eslint": "^8.54.0"
   },
   "lint-staged": {

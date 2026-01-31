@@ -5,7 +5,6 @@ import type {
   LoginSchemaType,
 } from '../validations/auth.validation.js';
 import type { AuthResponse, UserResponse } from '../types/auth.types.js';
-import type { UserRole } from '../generated/prisma/client.js';
 import { logger } from '../config/logger.config.js';
 import {
   redisService,
@@ -23,7 +22,7 @@ class AuthService {
   async register(data: RegisterSchemaType): Promise<AuthResponse> {
     try {
       // Check if user already exists
-      const existingUser = await db.user.findUnique({
+      const existingUser = await db.users.findUnique({
         where: { email: data.email },
       });
 
@@ -38,12 +37,12 @@ class AuthService {
       const hashedPassword = authHelper.hashPassword(data.password);
 
       // Create user
-      const user = await db.user.create({
+      const user = await db.users.create({
         data: {
-          username: data.username,
+          name: data.username,
           email: data.email,
-          password: hashedPassword,
-          role: data.role as UserRole,
+          passwordHash: hashedPassword,
+          role: data.role,
         },
       });
 
@@ -56,7 +55,7 @@ class AuthService {
       // STEP 2: Populate Redis with new user data
       const userToCache: CachedUserData = {
         id: user.id,
-        username: user.username,
+        username: user.name,
         email: user.email,
         role: user.role,
         createdAt: user.createdAt,
@@ -66,25 +65,26 @@ class AuthService {
       logger.info('Populated Redis with new user data');
 
       // STEP 3: Fetch all users from DB and populate Redis
-      const allUsers = await db.user.findMany({
+      const allUsers = await db.users.findMany({
         where: { isDeleted: false },
         select: {
           id: true,
-          username: true,
+          name: true,
           email: true,
           role: true,
           createdAt: true,
           updatedAt: true,
         },
       });
-      await redisService.populateUsers(allUsers as CachedUserData[]);
+      const mappedUsers = allUsers.map(u => ({ ...u, username: u.name }));
+      await redisService.populateUsers(mappedUsers as CachedUserData[]);
       logger.info(
         `Populated Redis with ${allUsers.length} users after registration`
       );
 
       // Generate token
       const token = authHelper.generateToken(
-        user.username,
+        user.name,
         user.email,
         user.id,
         user.role
@@ -98,7 +98,7 @@ class AuthService {
         data: {
           user: {
             id: user.id,
-            username: user.username,
+            username: user.name,
             email: user.email,
             role: user.role,
           },
@@ -131,7 +131,7 @@ class AuthService {
       } else {
         // STEP 2: Cache MISS - fetch from database
         logger.info('Login: Redis MISS - fetching from database');
-        const dbUser = await db.user.findUnique({
+        const dbUser = await db.users.findUnique({
           where: { email: data.email },
         });
 
@@ -139,10 +139,10 @@ class AuthService {
           // Populate Redis cache for next time
           const userToCache: CachedUserWithPassword = {
             id: dbUser.id,
-            username: dbUser.username,
+            username: dbUser.name,
             email: dbUser.email,
             role: dbUser.role,
-            password: dbUser.password,
+            password: dbUser.passwordHash,
             isDeleted: dbUser.isDeleted,
             isRestricted: dbUser.isRestricted,
             createdAt: dbUser.createdAt,
@@ -239,11 +239,11 @@ class AuthService {
       logger.info(
         `Profile: Redis MISS for user ${userId} - fetching from database`
       );
-      const user = await db.user.findUnique({
+      const user = await db.users.findUnique({
         where: { id: userId },
         select: {
           id: true,
-          username: true,
+          name: true,
           email: true,
           role: true,
           createdAt: true,
@@ -253,11 +253,12 @@ class AuthService {
 
       // STEP 3: Populate Redis cache for next time
       if (user) {
-        await redisService.populateUserById(user as CachedUserData);
+        const mappedUser = { ...user, username: user.name };
+        await redisService.populateUserById(mappedUser as CachedUserData);
         logger.info(`Profile: Populated Redis with user ${userId}`);
       }
 
-      return user;
+      return user ? { ...user, username: user.name } : null;
     } catch (error) {
       logger.error('Get profile error:', error);
       throw error;
@@ -284,11 +285,11 @@ class AuthService {
 
       // STEP 2: Cache MISS - fetch from database
       logger.info('GetAllUsers: Redis MISS - fetching from database');
-      const users = await db.user.findMany({
+      const users = await db.users.findMany({
         where: { isDeleted: false },
         select: {
           id: true,
-          username: true,
+          name: true,
           email: true,
           role: true,
           createdAt: true,
@@ -297,10 +298,11 @@ class AuthService {
       });
 
       // STEP 3: Populate Redis cache for next time
-      await redisService.populateUsers(users as CachedUserData[]);
+      const mappedUsers = users.map(u => ({ ...u, username: u.name }));
+      await redisService.populateUsers(mappedUsers as CachedUserData[]);
       logger.info(`GetAllUsers: Populated Redis with ${users.length} users`);
 
-      return users;
+      return users.map(u => ({ ...u, username: u.name }));
     } catch (error) {
       logger.error('Get all users error:', error);
       throw error;

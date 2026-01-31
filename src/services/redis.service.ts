@@ -1,7 +1,7 @@
 import { redis } from '../config/redis.config.js';
 import { logger } from '../config/logger.config.js';
 import { REDIS_KEYS, REDIS_TTL } from '../config/redis.constants.js';
-import type { UserRole } from '../generated/prisma/client.js';
+import type { UsersRole } from '../generated/prisma/client.js';
 
 /**
  * Cached user data interface (without password)
@@ -10,7 +10,7 @@ export interface CachedUserData {
   id: string;
   username: string;
   email: string;
-  role: UserRole;
+  role: UsersRole;
   createdAt: Date;
   updatedAt: Date;
 }

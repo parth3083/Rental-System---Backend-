@@ -1,0 +1,23 @@
+meta {
+  name: Reset code validation
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{Baseurl}}/api/auth/verify-reset-code
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email":"neutronstar30082003@gmail.com",
+    "code":"965289"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

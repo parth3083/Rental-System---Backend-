@@ -15,7 +15,10 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "seed": "pnpm run build && node dist/scripts/seed.js"
+    "seed": "pnpm run build && node dist/scripts/seed.js",
+    "generate": "npx prisma generate",
+    "migrate": "npx prisma migrate dev",
+    "studio": "npx prisma studio"
   },
   "keywords": [],
   "author": "",
@@ -24,6 +27,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@upstash/redis": "^1.36.1",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -35,6 +39,7 @@
     "jsonwebtoken": "^9.0.3",
     "lint-staged": "^16.2.7",
     "morgan": "^1.10.1",
+    "nodemailer": "^7.0.13",
     "pg": "^8.18.0",
     "prettier": "^3.8.1",
     "swagger-jsdoc": "^6.2.8",
@@ -52,6 +57,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^25.1.0",
+    "@types/nodemailer": "^7.0.9",
     "@types/pg": "^8.16.0",
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",

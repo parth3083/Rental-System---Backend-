@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import 'dotenv/config';
 import { logger } from '../config/logger.config.js';
 import { authHelper } from '../helpers/auth.helper.js';
-import type { UserRole } from '../generated/prisma/client.js';
+import type { UsersRole } from '../generated/prisma/client.js';
 
 /**
  * Middleware to authenticate JWT token
@@ -43,7 +43,7 @@ export const authMiddleware = (
  * Middleware factory to restrict access based on roles
  * @param allowedRoles - Array of roles that are allowed to access the route
  */
-export const roleMiddleware = (...allowedRoles: UserRole[]) => {
+export const roleMiddleware = (...allowedRoles: UsersRole[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({

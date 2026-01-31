@@ -1,0 +1,25 @@
+meta {
+  name: Register user
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{Baseurl}}/api/auth/register
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "customer1",
+    "email": "customer1@rental.com",
+    "password": "123456",
+    "role": "CUSTOMER"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -13,22 +7,217 @@ datasource db {
   provider = "postgresql"
 }
 
-enum UserRole {
+enum UsersRole {
   ADMIN
   VENDOR
   CUSTOMER
 }
 
-model User {
-  id           String   @id @default(cuid())
-  username     String
-  email        String   @unique
-  password     String
-  role         UserRole @default(CUSTOMER)
-  isDeleted    Boolean  @default(false)
-  isRestricted Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Users {
+  id           String    @id @default(cuid())
+  name         String    @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash")
+  role         UsersRole @default(CUSTOMER)
+  companyName  String?   @map("company_name") @db.VarChar(255)
+  gstin        String?   @unique @db.VarChar(15)
+
+  // Audit & Soft Delete
+  createdAt    DateTime  @default(now()) @map("created_at")
+  createdBy    String?   @map("created_by")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  updatedBy    String?   @map("updated_by")
+  deletedAt    DateTime? @map("deleted_at")
+  isDeleted    Boolean   @default(false) @map("is_deleted")
+  isRestricted Boolean   @default(false) @map("is_restricted")
+
+  // Relations
+  products     Product[]
+  orders       SalesOrder[] @relation("CustomerOrders")
+  vendorOrders SalesOrder[] @relation("VendorOrders")
+
+  @@map("users")
+}
+
+// 2. Product Management
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  vendorId    String  @map("vendor_id")
+  vendor      Users   @relation(fields: [vendorId], references: [id])
+  name        String
+  brand       String
+  color       String
+  imageUrl    String
+  description String?
+
+  // Base price is per day as per implication
+  dailyPrice         Decimal
+  discountPercentage Int      @default(0)
+  securityDeposit    Decimal? @map("security_deposit") @db.Decimal(10, 2)
+
+  isAvailable Boolean @default(true)
+  isPublished Boolean @default(false) @map("is_published")
+
+  categoryId Int
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  // Audit & Soft Delete
+  createdAt         DateTime           @default(now()) @map("created_at")
+  createdBy         Int?               @map("created_by")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  updatedBy         Int?               @map("updated_by")
+  deletedAt         DateTime?          @map("deleted_at")
+  stock             Stock?
+  stockTransactions StockTransaction[]
+  salesOrderDetails SalesOrderDetail[]
+}
+
+// 3. Stock Management
+model Stock {
+  id                    String  @id @default(cuid())
+  productId             String  @unique @map("product_id")
+  product               Product @relation(fields: [productId], references: [id])
+  totalPhysicalQuantity Int     @default(0) @map("total_physical_quantity")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("stock")
+}
+
+model StockTransaction {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  orderId   String?  @map("order_id")
+  moveType  String   @map("move_type")
+  quantity  Int      @map("quantity")
+  startDate DateTime @default(now()) @map("start_date")
+  endDate   DateTime @default(now()) @map("end_date")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("stock_transactions")
+}
+
+// 4. Sales Order & Details
+enum OrderStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentPlan {
+  FULL_UPFRONT
+  PARTIAL_MONTHLY
+}
+
+model SalesOrder {
+  id              String      @id @default(cuid())
+  customerId      String      @map("customer_id")
+  customer        Users       @relation("CustomerOrders", fields: [customerId], references: [id])
+  vendorId        String      @map("vendor_id")
+  vendor          Users       @relation("VendorOrders", fields: [vendorId], references: [id])
+  status          OrderStatus @default(DRAFT)
+  paymentPlan     PaymentPlan @map("payment_plan")
+  totalOrderValue Decimal     @map("total_order_value") @db.Decimal(10, 2)
+  startDate       DateTime    @map("start_date")
+  endDate         DateTime    @map("end_date")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  details        SalesOrderDetail[]
+  invoices       SalesInvoice[]
+  paymentLedgers PaymentLedger[]
+
+  @@map("sales_order")
+}
+
+model SalesOrderDetail {
+  id        String     @id @default(cuid())
+  orderId   String     @map("order_id")
+  order     SalesOrder @relation(fields: [orderId], references: [id])
+  productId String     @map("product_id")
+  product   Product    @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal    @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal    @db.Decimal(10, 2)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("sales_order_details")
+}
+
+// 5. Invoicing & Logistics
+enum DeliveryStatus {
+  PROCESSING
+  DISPATCHED
+  DELIVERED
+  RETURNED
+}
+
+model SalesInvoice {
+  id             String         @id @default(cuid())
+  orderId        String         @map("order_id")
+  order          SalesOrder     @relation(fields: [orderId], references: [id])
+  invoiceNumber  String         @unique @map("invoice_number")
+  deliveryStatus DeliveryStatus @default(PROCESSING) @map("delivery_status")
+  taxAmount      Decimal        @map("tax_amount") @db.Decimal(10, 2)
+  grandTotal     Decimal        @map("grand_total") @db.Decimal(10, 2)
+  isPaid         Boolean        @default(false) @map("is_paid")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("sales_invoice")
+}
+
+// 6. Payment Ledger for Tracking Paid Time
+model PaymentLedger {
+  id               String     @id @default(cuid())
+  orderId          String     @map("order_id")
+  order            SalesOrder @relation(fields: [orderId], references: [id])
+  amountPaid       Decimal    @map("amount_paid") @db.Decimal(10, 2)
+  paidPeriodStart  DateTime?  @map("paid_period_start")
+  paidPeriodEnd    DateTime?  @map("paid_period_end")
+  paymentReference String?    @map("payment_reference")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy Int?      @map("created_by")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy Int?      @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("payment_ledger")
 }
 
 model Category {

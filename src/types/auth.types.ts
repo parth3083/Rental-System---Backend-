@@ -1,17 +1,17 @@
-import type { UserRole } from '../generated/prisma/client.js';
+import type { UsersRole } from '../generated/prisma/client.js';
 
 export interface JwtPayload {
   id: string;
   email: string;
   username: string;
-  role: UserRole;
+  role: UsersRole;
 }
 
 export interface RegisterInput {
   username: string;
   email: string;
   password: string;
-  role?: UserRole;
+  role?: UsersRole;
 }
 
 export interface LoginInput {
@@ -27,7 +27,7 @@ export interface AuthResponse {
       id: string;
       username: string;
       email: string;
-      role: UserRole;
+      role: UsersRole;
     };
     token: string;
   };
@@ -37,7 +37,7 @@ export interface UserResponse {
   id: string;
   username: string;
   email: string;
-  role: UserRole;
+  role: UsersRole;
   createdAt: Date;
   updatedAt: Date;
 }

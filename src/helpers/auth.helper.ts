@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
-import type { UserRole } from '../generated/prisma/client.js';
+import type { UsersRole } from '../generated/prisma/client.js';
 import type { JwtPayload } from '../types/auth.types.js';
 
 const jwtSecret = process.env.JWT_SECRET!;
@@ -12,7 +12,7 @@ type AuthHelper = {
     username: string,
     email: string,
     id: string,
-    role: UserRole
+    role: UsersRole
   ) => string;
   passwordVerify: (
     password: string,
@@ -33,7 +33,7 @@ class AuthHelpers implements AuthHelper {
     username: string,
     email: string,
     id: string,
-    role: UserRole
+    role: UsersRole
   ): string => {
     const token = jwt.sign({ username, email, id, role }, jwtSecret, {
       expiresIn: '1d',

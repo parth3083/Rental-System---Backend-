@@ -1,30 +1,55 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
+import type { UserRole } from '../generated/prisma/client.js';
+import type { JwtPayload } from '../types/auth.types.js';
 
 const jwtSecret = process.env.JWT_SECRET!;
 
 type AuthHelper = {
   hashPassword: (password: string) => string;
-  generateToken: (username: string, email: string, id: string) => string;
+  generateToken: (
+    username: string,
+    email: string,
+    id: string,
+    role: UserRole
+  ) => string;
   passwordVerify: (
     password: string,
     hashedPassword: string
   ) => Promise<boolean>;
+  verifyToken: (token: string) => JwtPayload | null;
 };
 
 class AuthHelpers implements AuthHelper {
   constructor() {}
+
   hashPassword = (password: string): string => {
     const hashedPassword: string = bcrypt.hashSync(password, 10);
     return hashedPassword;
   };
-  generateToken = (username: string, email: string, id: string): string => {
-    const token = jwt.sign({ username, email, id }, jwtSecret, {
+
+  generateToken = (
+    username: string,
+    email: string,
+    id: string,
+    role: UserRole
+  ): string => {
+    const token = jwt.sign({ username, email, id, role }, jwtSecret, {
       expiresIn: '1d',
     });
     return token;
   };
+
+  verifyToken = (token: string): JwtPayload | null => {
+    try {
+      const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
+      return decoded;
+    } catch {
+      return null;
+    }
+  };
+
   passwordVerify = async (
     password: string,
     hashedPassword: string

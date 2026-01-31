@@ -4,7 +4,9 @@
     "prisma.config.ts",
     "node_modules",
     "dist",
-    "eslint.config.ts"
+    "eslint.config.ts",
+    "tests",
+    "jest.config.js"
   ],
   "compilerOptions": {
     // File Layout

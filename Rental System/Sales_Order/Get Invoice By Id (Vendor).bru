@@ -1,0 +1,15 @@
+meta {
+  name: Get Invoice By Id (Vendor)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{Baseurl}}/api/sales-orders/invoice/cml2usn96000yjsfgwfb7p6gi
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}

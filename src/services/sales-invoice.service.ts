@@ -161,4 +161,120 @@ export const salesInvoiceService = {
       throw error;
     }
   },
+  getInvoicesByVendorId: async ({
+    vendorId,
+    page,
+    limit,
+  }: {
+    vendorId: string;
+    page: number;
+    limit: number;
+  }) => {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [total, invoices] = await Promise.all([
+        db.salesInvoice.count({
+          where: {
+            order: {
+              vendorId: vendorId,
+            },
+            deletedAt: null,
+          },
+        }),
+        db.salesInvoice.findMany({
+          where: {
+            order: {
+              vendorId: vendorId,
+            },
+            deletedAt: null,
+          },
+          include: {
+            order: {
+              select: {
+                id: true,
+                totalOrderValue: true,
+                customer: {
+                  select: {
+                    name: true,
+                    email: true,
+                    companyName: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip: skip,
+          take: limit,
+        }),
+      ]);
+
+      return {
+        data: invoices,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      logger.error('Error in getInvoicesByVendorId service', error);
+      throw error;
+    }
+  },
+
+  getInvoiceById: async ({
+    invoiceId,
+    vendorId,
+  }: {
+    invoiceId: string;
+    vendorId: string;
+  }) => {
+    try {
+      const invoice = await db.salesInvoice.findUnique({
+        where: { id: invoiceId },
+        include: {
+          order: {
+            include: {
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  companyName: true,
+                  address: true,
+                  city: true,
+                  pincode: true,
+                  gstin: true,
+                },
+              },
+              details: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!invoice) {
+        throw new Error('Invoice not found');
+      }
+
+      // Authorization Check
+      if (invoice.order.vendorId !== vendorId) {
+        throw new Error('Unauthorized access to this invoice');
+      }
+
+      return invoice;
+    } catch (error) {
+      logger.error('Error in getInvoiceById service', error);
+      throw error;
+    }
+  },
 };

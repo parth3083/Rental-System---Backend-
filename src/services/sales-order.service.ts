@@ -1,6 +1,10 @@
 import { db } from '../config/db.config.js';
 import { logger } from '../config/logger.config.js';
-import { Prisma, OrderStatus } from '../generated/prisma/client.js';
+import {
+  Prisma,
+  OrderStatus,
+  DeliveryStatus,
+} from '../generated/prisma/client.js';
 import { cartService } from './cart.service.js';
 
 interface GetVendorOrdersParams {
@@ -41,6 +45,7 @@ export const salesOrderService = {
             paymentPlan: true,
             totalOrderValue: true,
             createdAt: true,
+            isService: true,
             customer: {
               select: {
                 id: true,
@@ -66,6 +71,11 @@ export const salesOrderService = {
             details: {
               select: {
                 end_date: true,
+                product: {
+                  select: {
+                    name: true,
+                  },
+                },
               },
             },
             paymentLedgers: {
@@ -124,6 +134,8 @@ export const salesOrderService = {
           payment_amount_pending: pendingAmount,
           invoice_number: invoice?.invoiceNumber || null,
           message: message,
+          is_service: order.isService,
+          product_names: order.details.map(d => d.product.name),
         };
       });
 
@@ -138,6 +150,145 @@ export const salesOrderService = {
       };
     } catch (error) {
       logger.error('Error in getOrdersByVendorId service', error);
+      throw error;
+    }
+  },
+
+  getOrdersByCustomerId: async ({
+    customerId,
+    page,
+    limit,
+  }: {
+    customerId: string;
+    page: number;
+    limit: number;
+  }) => {
+    try {
+      const skip = (page - 1) * limit;
+
+      const [total, orders] = await Promise.all([
+        db.salesOrder.count({
+          where: {
+            customerId: customerId,
+            deletedAt: null,
+          },
+        }),
+        db.salesOrder.findMany({
+          where: {
+            customerId: customerId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            status: true,
+            paymentPlan: true,
+            totalOrderValue: true,
+            createdAt: true,
+            isService: true,
+            vendor: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                companyName: true,
+              },
+            },
+            invoices: {
+              select: {
+                id: true,
+                invoiceNumber: true,
+                deliveryStatus: true,
+              },
+              where: {
+                deletedAt: null,
+              },
+              take: 1,
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+            details: {
+              select: {
+                end_date: true,
+                product: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+            paymentLedgers: {
+              select: {
+                amountPaid: true,
+              },
+              where: {
+                deletedAt: null,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          skip: skip,
+          take: limit,
+        }),
+      ]);
+
+      const formattedOrders = orders.map(order => {
+        // Calculate pending amount
+        const totalPaid = order.paymentLedgers.reduce((sum, ledger) => {
+          return sum.add(new Prisma.Decimal(ledger.amountPaid || 0));
+        }, new Prisma.Decimal(0));
+
+        const pendingAmount = new Prisma.Decimal(
+          order.totalOrderValue || 0
+        ).sub(totalPaid);
+
+        // Determine status
+        // If invoice exists, take status from invoice (DeliveryStatus), otherwise order status (OrderStatus)
+        const invoice = order.invoices[0];
+        const status = invoice ? invoice.deliveryStatus : order.status;
+
+        // Check for expiration
+        const today = new Date();
+        let message = null;
+
+        const hasExpiredItem = order.details.some(detail => {
+          if (!detail.end_date) return false;
+          return new Date(detail.end_date) < today;
+        });
+
+        if (hasExpiredItem) {
+          message =
+            'Due date has expired please return your product or late fee will apply';
+        }
+
+        return {
+          id: order.id,
+          vendor: order.vendor,
+          status: status,
+          payment_plan: order.paymentPlan,
+          total_order_value: order.totalOrderValue,
+          created_at: order.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
+          payment_amount_pending: pendingAmount,
+          invoice_number: invoice?.invoiceNumber || null,
+          message: message,
+          is_service: order.isService,
+          product_names: order.details.map(d => d.product.name),
+        };
+      });
+
+      return {
+        data: formattedOrders,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      logger.error('Error in getOrdersByCustomerId service', error);
       throw error;
     }
   },
@@ -517,7 +668,7 @@ export const salesOrderService = {
           orderId: orderId,
         },
         data: {
-          deliveryStatus: 'COMPLETED', // Use string literal or enum from client. Enum is safer but string works if typed correctly.
+          deliveryStatus: DeliveryStatus.COMPLETED,
         },
       });
 
@@ -531,6 +682,69 @@ export const salesOrderService = {
       };
     } catch (error) {
       logger.error('Error in calculateReturn service', error);
+      throw error;
+    }
+  },
+  getOrderById: async (orderId: string, userId: string) => {
+    try {
+      const order = await db.salesOrder.findUnique({
+        where: { id: orderId },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              companyName: true,
+            },
+          },
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              companyName: true,
+            },
+          },
+          invoices: true,
+          details: {
+            include: {
+              product: true,
+            },
+          },
+          paymentLedgers: true,
+        },
+      });
+
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // Authorization Check
+      if (order.customerId !== userId && order.vendorId !== userId) {
+        throw new Error('Unauthorized access to this order');
+      }
+
+      // Calculate pending amount
+      const totalPaid = order.paymentLedgers.reduce((sum, ledger) => {
+        return sum.add(new Prisma.Decimal(ledger.amountPaid || 0));
+      }, new Prisma.Decimal(0));
+
+      const pendingAmount = new Prisma.Decimal(order.totalOrderValue || 0).sub(
+        totalPaid
+      );
+
+      // Determine status from invoice if available
+      const invoice = order.invoices.length > 0 ? order.invoices[0] : null;
+      const status = invoice ? invoice.deliveryStatus : order.status;
+
+      return {
+        ...order,
+        status: status,
+        payment_amount_pending: pendingAmount,
+      };
+    } catch (error) {
+      logger.error('Error in getOrderById service', error);
       throw error;
     }
   },

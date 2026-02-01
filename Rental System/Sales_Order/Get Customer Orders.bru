@@ -1,0 +1,15 @@
+meta {
+  name: Get Customer Orders
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{Baseurl}}/api/sales-orders/customer?page=1&limit=10
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}

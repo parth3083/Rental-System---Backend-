@@ -15,6 +15,14 @@ router.get(
   roleMiddleware('VENDOR'),
   salesOrderController.getVendorOrders
 );
+
+// Route to get sales orders for customers
+router.get(
+  '/customer',
+  authMiddleware,
+  roleMiddleware('CUSTOMER'),
+  salesOrderController.getCustomerOrders
+);
 router.post(
   '/invoice',
   authMiddleware,
@@ -35,6 +43,9 @@ router.post(
   roleMiddleware('CUSTOMER'),
   salesOrderController.createOrder
 );
+
+// Route to get single order by ID
+router.get('/:orderId', authMiddleware, salesOrderController.getOrderById);
 
 // Route to update sales order status
 router.patch(

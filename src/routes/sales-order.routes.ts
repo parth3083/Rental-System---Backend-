@@ -36,6 +36,22 @@ router.patch(
   salesOrderController.updateInvoiceStatus
 );
 
+// Route to get list of invoices for vendor
+router.get(
+  '/invoice',
+  authMiddleware,
+  roleMiddleware('VENDOR'),
+  salesOrderController.getInvoices
+);
+
+// Route to get single invoice by ID
+router.get(
+  '/invoice/:invoiceId',
+  authMiddleware,
+  roleMiddleware('VENDOR'),
+  salesOrderController.getInvoiceById
+);
+
 // Route to create a new sales order
 router.post(
   '/',

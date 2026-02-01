@@ -1,0 +1,15 @@
+meta {
+  name: Get Invoices (Vendor)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{Baseurl}}/api/sales-orders/invoice?page=1&limit=10
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}

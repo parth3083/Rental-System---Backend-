@@ -496,4 +496,98 @@ export const salesOrderController = {
       });
     }
   },
+  getInvoices: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const vendorId = req.user?.id;
+      const page = Number(req.query.page) || 1;
+      const limit = Number(req.query.limit) || 10;
+
+      if (!vendorId) {
+        res.status(401).json({
+          success: false,
+          message: 'User authentication failed',
+        });
+        return;
+      }
+
+      const result = await salesInvoiceService.getInvoicesByVendorId({
+        vendorId,
+        page,
+        limit,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Invoices retrieved successfully',
+        data: result.data,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      logger.error('Error in getInvoices controller', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  },
+
+  getInvoiceById: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const vendorId = req.user?.id;
+      const invoiceIdParam = req.params.invoiceId;
+      const invoiceId = Array.isArray(invoiceIdParam)
+        ? invoiceIdParam[0]
+        : invoiceIdParam;
+
+      if (!vendorId) {
+        res.status(401).json({
+          success: false,
+          message: 'User authentication failed',
+        });
+        return;
+      }
+
+      if (!invoiceId) {
+        res.status(400).json({
+          success: false,
+          message: 'Invoice ID is required',
+        });
+        return;
+      }
+
+      const invoice = await salesInvoiceService.getInvoiceById({
+        invoiceId,
+        vendorId,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Invoice retrieved successfully',
+        data: invoice,
+      });
+    } catch (error: any) {
+      logger.error('Error in getInvoiceById controller', error);
+
+      if (error.message === 'Invoice not found') {
+        res.status(404).json({
+          success: false,
+          message: 'Invoice not found',
+        });
+        return;
+      }
+
+      if (error.message === 'Unauthorized access to this invoice') {
+        res.status(403).json({
+          success: false,
+          message: 'Unauthorized access to this invoice',
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  },
 };

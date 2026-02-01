@@ -259,14 +259,15 @@ export const salesOrderController = {
 
   updateOrderStatus: async (req: Request, res: Response): Promise<void> => {
     try {
-      const vendorId = req.user?.id;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
       const orderIdParam = req.params.orderId;
       const orderId = Array.isArray(orderIdParam)
         ? orderIdParam[0]
         : orderIdParam;
       const { status } = req.body;
 
-      if (!vendorId) {
+      if (!userId || !userRole) {
         res.status(401).json({
           success: false,
           message: 'User authentication failed',
@@ -282,17 +283,9 @@ export const salesOrderController = {
         return;
       }
 
-      // Valid statuses for a vendor to set 'SENT' implies 'SENT' status, but generally we can allow valid enum values
-      // We will allow any valid enum status for now, or specifically check if it is 'SENT' if that's the only allowed action
-      // Prompt says "he will be able to update the status to sent"
-      // I'll validate against OrderStatus enum
-      // Assuming OrderStatus is imported? We need to make sure we import OrderStatus from prisma client if not already
-      // Controller seems to import DeliveryStatus but maybe not OrderStatus.
-
-      // I'll assume standard validation
-
       const updatedOrder = await salesOrderService.updateOrderStatus({
-        vendorId,
+        userId,
+        userRole,
         orderId,
         status: status as OrderStatus,
       });
@@ -304,6 +297,66 @@ export const salesOrderController = {
       });
     } catch (error: any) {
       logger.error('Error in updateOrderStatus controller', error);
+
+      if (error.message === 'Order not found') {
+        res.status(404).json({
+          success: false,
+          message: 'Order not found',
+        });
+        return;
+      }
+
+      if (error.message === 'Unauthorized access to this order') {
+        res.status(403).json({
+          success: false,
+          message: 'Unauthorized access to this order',
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
+    }
+  },
+
+  acceptQuotation: async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+      const orderIdParam = req.params.orderId;
+      const orderId = Array.isArray(orderIdParam)
+        ? orderIdParam[0]
+        : orderIdParam;
+
+      if (!userId) {
+        res.status(401).json({
+          success: false,
+          message: 'User authentication failed',
+        });
+        return;
+      }
+
+      if (!orderId) {
+        res.status(400).json({
+          success: false,
+          message: 'Order ID is required',
+        });
+        return;
+      }
+
+      const updatedOrder = await salesOrderService.acceptQuotation(
+        orderId,
+        userId
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Quotation accepted successfully',
+        data: updatedOrder,
+      });
+    } catch (error: any) {
+      logger.error('Error in acceptQuotation controller', error);
 
       if (error.message === 'Order not found') {
         res.status(404).json({

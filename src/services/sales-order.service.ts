@@ -30,13 +30,13 @@ export const salesOrderService = {
       const [total, orders] = await Promise.all([
         db.salesOrder.count({
           where: {
-            vendorId: vendorId,
+            vendorId,
             deletedAt: null,
           },
         }),
         db.salesOrder.findMany({
           where: {
-            vendorId: vendorId,
+            vendorId,
             deletedAt: null,
           },
           select: {
@@ -90,7 +90,7 @@ export const salesOrderService = {
           orderBy: {
             createdAt: 'desc',
           },
-          skip: skip,
+          skip,
           take: limit,
         }),
       ]);
@@ -123,6 +123,8 @@ export const salesOrderService = {
           message =
             'Due date has expired please return your product or late fee will apply';
         }
+
+        const productNames = order.details.map(d => d.product.name).join(', ');
 
         return {
           id: order.id,
@@ -209,10 +211,15 @@ export const salesOrderService = {
             },
             details: {
               select: {
+                id: true,
+                quantity: true,
+                subtotal: true,
+                unitPrice: true,
                 end_date: true,
                 product: {
                   select: {
                     name: true,
+                    imageUrl: true,
                   },
                 },
               },
@@ -267,14 +274,20 @@ export const salesOrderService = {
           id: order.id,
           vendor: order.vendor,
           status: status,
-          payment_plan: order.paymentPlan,
-          total_order_value: order.totalOrderValue,
-          created_at: order.createdAt.toISOString().split('T')[0], // YYYY-MM-DD
-          payment_amount_pending: pendingAmount,
-          invoice_number: invoice?.invoiceNumber || null,
+          paymentPlan: order.paymentPlan,
+          totalOrderValue: Number(order.totalOrderValue),
+          createdAt: order.createdAt.toISOString(),
+          paymentAmountPending: Number(pendingAmount),
+          invoiceNumber: invoice?.invoiceNumber || null,
           message: message,
-          is_service: order.isService,
-          product_names: order.details.map(d => d.product.name),
+          isService: order.isService,
+          details: order.details.map(d => ({
+            id: d.id,
+            quantity: d.quantity,
+            subtotal: Number(d.subtotal),
+            unitPrice: Number(d.unitPrice),
+            product: d.product,
+          })),
         };
       });
 
@@ -478,11 +491,13 @@ export const salesOrderService = {
    * Update sales order status (Vendor only)
    */
   updateOrderStatus: async ({
-    vendorId,
+    userId,
+    userRole,
     orderId,
     status,
   }: {
-    vendorId: string;
+    userId: string;
+    userRole: string;
     orderId: string;
     status: OrderStatus;
   }) => {
@@ -490,19 +505,34 @@ export const salesOrderService = {
       // 1. Fetch Order with details to know products
       const order = await db.salesOrder.findUnique({
         where: { id: orderId },
-        include: { details: true },
+        include: { details: true, customer: true },
       });
 
       if (!order) {
         throw new Error('Order not found');
       }
 
-      // 2. Validate Ownership
-      if (order.vendorId !== vendorId) {
-        throw new Error('Unauthorized access to this order');
+      // 2. Validate Ownership based on Role
+      if (userRole === 'VENDOR') {
+        if (order.vendorId !== userId) {
+          throw new Error('Unauthorized access to this order');
+        }
+      } else if (userRole === 'CUSTOMER') {
+        if (order.customerId !== userId) {
+          throw new Error('Unauthorized access to this order');
+        }
+      } else {
+        // Admin or other?
+        // For now assuming only Vendor/Customer as per route middleware
       }
 
       // 3. Handle Stock Deduction if status changing to APPROVED
+      // This applies primarily when Vendor approves, OR potentially when Customer accepts (status -> APPROVED)
+      // If Customer accepts (SENT -> APPROVED), we need to trigger stock logic?
+      // Usually Vendor approves the order first (DRAFT -> APPROVED) for direct sales,
+      // OR Vendor sends Quote (DRAFT -> SENT) and Customer accepts (SENT -> CONFIRMED/APPROVED).
+      // If Customer sets to APPROVED, we should probably run the same checks.
+
       if (
         status === OrderStatus.APPROVED &&
         order.status !== OrderStatus.APPROVED
@@ -580,9 +610,131 @@ export const salesOrderService = {
         },
       });
 
+      // 5. Send Quotation Email if status is SENT
+      if (status === OrderStatus.SENT && order.status !== OrderStatus.SENT) {
+        // Use a dynamic import or ensure it's imported at top
+        const { sendQuotationEmail } =
+          await import('../templates/email/quotation.email.template.js');
+        sendQuotationEmail(
+          order.customer.email,
+          order.customer.name,
+          order.id.toUpperCase().substring(0, 8),
+          order.id
+        ).catch(err => {
+          logger.error('Failed to send quotation email', err);
+        });
+      }
+
       return updatedOrder;
     } catch (error) {
       logger.error('Error in updateOrderStatus service', error);
+      throw error;
+    }
+  },
+
+  acceptQuotation: async (orderId: string, userId: string) => {
+    try {
+      // 1. Fetch Order
+      const order = await db.salesOrder.findUnique({
+        where: { id: orderId },
+        include: { details: true },
+      });
+
+      if (!order) {
+        throw new Error('Order not found');
+      }
+
+      // 2. Validate Ownership (Customer only)
+      if (order.customerId !== userId) {
+        throw new Error('Unauthorized access to this order');
+      }
+
+      // 3. Validate Status
+      // Can only accept if status is SENT
+      if (order.status !== OrderStatus.SENT) {
+        throw new Error('Order is not in a valid state to be accepted');
+      }
+
+      // 4. Update Status to APPROVED
+      // This is similar to updateOrderStatus logic for stock deduction
+      // We need to deduct stock/check availability as we are confirming the order.
+      // Reusing logic or determining here.
+      // If we move to APPROVED, we must reserve stock.
+
+      if (order.isService) {
+        // RENTAL: Check availability and Reserve
+        for (const detail of order.details) {
+          if (!detail.start_date || !detail.end_date) {
+            throw new Error(
+              `Missing dates for rental item in order detail ${detail.id}`
+            );
+          }
+          const isAvailable = await cartService.checkStockAvailability(
+            detail.productId,
+            detail.start_date,
+            detail.end_date,
+            detail.quantity
+          );
+          if (!isAvailable) {
+            throw new Error(
+              `Insufficient stock to accept order for product ID ${detail.productId}`
+            );
+          }
+        }
+
+        // If all ok, Create Transaction Logs
+        for (const detail of order.details) {
+          await db.stockTransaction.create({
+            data: {
+              productId: detail.productId,
+              orderId: order.id,
+              moveType: 'RENTAL',
+              quantity: detail.quantity,
+              startDate: detail.start_date!,
+              endDate: detail.end_date!,
+            },
+          });
+        }
+      } else {
+        // PURCHASE
+        for (const detail of order.details) {
+          const stock = await db.stock.findUnique({
+            where: { productId: detail.productId },
+          });
+          if (!stock || stock.totalPhysicalQuantity < detail.quantity) {
+            throw new Error(
+              `Insufficient stock to accept purchase for product ID ${detail.productId}`
+            );
+          }
+
+          await db.stock.update({
+            where: { productId: detail.productId },
+            data: { totalPhysicalQuantity: { decrement: detail.quantity } },
+          });
+
+          await db.stockTransaction.create({
+            data: {
+              productId: detail.productId,
+              orderId: order.id,
+              moveType: 'SALE',
+              quantity: detail.quantity,
+              startDate: new Date(),
+              endDate: new Date(),
+            },
+          });
+        }
+      }
+
+      const updatedOrder = await db.salesOrder.update({
+        where: { id: orderId },
+        data: {
+          status: OrderStatus.APPROVED,
+        },
+      });
+
+      return updatedOrder;
+    } catch (error) {
+      logger.error('Error in acceptQuotation service', error);
       throw error;
     }
   },

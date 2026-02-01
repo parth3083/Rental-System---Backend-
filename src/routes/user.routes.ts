@@ -20,6 +20,9 @@ router.get('/', userController.getAllUsers);
 // GET /api/users/me - Get current user details
 router.get('/me', userController.getUserDetails);
 
+// GET /api/users/:id - Get user details by ID (Admin only)
+router.get('/:id', userController.getUserById);
+
 // PATCH /api/users/me - Update current user details
 router.patch('/me', userController.updateUserDetails);
 

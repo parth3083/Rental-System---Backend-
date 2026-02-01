@@ -67,8 +67,16 @@ router.get('/:orderId', authMiddleware, salesOrderController.getOrderById);
 router.patch(
   '/:orderId/status',
   authMiddleware,
-  roleMiddleware('VENDOR'),
+  roleMiddleware('VENDOR', 'CUSTOMER'),
   salesOrderController.updateOrderStatus
+);
+
+// Route to accept quotation
+router.post(
+  '/accept/:orderId',
+  authMiddleware,
+  roleMiddleware('CUSTOMER'),
+  salesOrderController.acceptQuotation
 );
 
 // Route to get return calculation summary

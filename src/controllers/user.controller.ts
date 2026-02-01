@@ -166,6 +166,67 @@ class UserController {
 
   /**
    * @swagger
+   * /api/users/{id}:
+   *   get:
+   *     summary: Get user details by ID (Admin only)
+   *     tags: [Users]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: User details retrieved successfully
+   *       403:
+   *         description: Forbidden
+   *       404:
+   *         description: User not found
+   */
+  async getUserById(
+    req: Request<{ id: string }>,
+    res: Response
+  ): Promise<void> {
+    try {
+      const { id } = req.params;
+      const requesterRole = req.user?.role;
+
+      if (requesterRole !== 'ADMIN') {
+        res.status(403).json({
+          success: false,
+          message: 'Forbidden: Only admins can view other user details',
+        });
+        return;
+      }
+
+      // Reusing getUserDetails service but passing the target ID
+      // The second arg (userRole) controls what fields are returned.
+      // Since requester is ADMIN, we want to see everything, so we pass 'ADMIN' effectively, or the user's own role?
+      // filterUserDetailsByRole filters based on the *user's* role mostly, or the *requester's* role?
+      // The service method signature is: getUserDetails(userId: string, userRole: UsersRole)
+      // Implementation uses userRole to filter. If I pass ADMIN, I get everything.
+      const result = await userService.getUserDetails(id, 'ADMIN');
+
+      if (!result.success) {
+        res.status(404).json(result);
+        return;
+      }
+
+      res.status(200).json(result);
+    } catch (error) {
+      logger.error('Get user by id controller error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  /**
+   * @swagger
    * /api/users/me:
    *   patch:
    *     summary: Update current user details
